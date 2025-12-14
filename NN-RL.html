@@ -1,0 +1,1478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Deep Q Grid Hunter</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <style>
+    body {
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      min-height: 100vh;
+    }
+    .glow-text {
+      text-shadow: 0 0 10px rgba(96, 165, 250, 0.5), 0 0 20px rgba(96, 165, 250, 0.3);
+    }
+    .panel {
+      background: rgba(30, 41, 59, 0.9);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(96, 165, 250, 0.2);
+    }
+    canvas {
+      image-rendering: pixelated;
+    }
+    .stat-value {
+      font-family: 'Courier New', monospace;
+    }
+    .network-layer {
+      background: linear-gradient(180deg, rgba(59, 130, 246, 0.1) 0%, rgba(59, 130, 246, 0.05) 100%);
+    }
+    @keyframes pulse-glow {
+      0%, 100% { box-shadow: 0 0 5px rgba(34, 197, 94, 0.5); }
+      50% { box-shadow: 0 0 20px rgba(34, 197, 94, 0.8); }
+    }
+    .training-active {
+      animation: pulse-glow 1s ease-in-out infinite;
+    }
+    .collapsible-header {
+      cursor: pointer;
+      user-select: none;
+    }
+    .collapsible-header:hover {
+      background: rgba(96, 165, 250, 0.1);
+    }
+    .collapsible-content {
+      max-height: 1000px;
+      overflow: hidden;
+      transition: max-height 0.3s ease-out, padding 0.3s ease-out;
+    }
+    .collapsible-content.collapsed {
+      max-height: 0;
+      padding-top: 0;
+      padding-bottom: 0;
+    }
+    .collapse-icon {
+      transition: transform 0.3s ease;
+    }
+    .collapse-icon.collapsed {
+      transform: rotate(-90deg);
+    }
+    .neuron {
+      transition: all 0.15s ease;
+    }
+  </style>
+</head>
+<body class="text-gray-100 p-2 md:p-4">
+  <div class="max-w-7xl mx-auto">
+    <!-- Header -->
+    <header class="text-center mb-4">
+      <h1 class="text-2xl md:text-4xl font-bold glow-text text-blue-400 mb-1">🧠 Deep Q Grid Hunter</h1>
+      <p class="text-gray-400 text-sm">Watch an AI learn to navigate, hunt food, and avoid enemies using Deep Q-Learning</p>
+    </header>
+
+    <!-- Main Layout -->
+    <div class="flex flex-col xl:flex-row gap-4">
+      
+      <!-- Left Column: Controls & Config -->
+      <div class="xl:w-64 space-y-3 flex-shrink-0">
+        <!-- Control Panel -->
+        <div class="panel rounded-xl overflow-hidden">
+          <div class="collapsible-header p-3 flex items-center justify-between" onclick="togglePanel(this)">
+            <h2 class="text-base font-semibold text-blue-300 flex items-center gap-2">
+              <span>⚙️</span> Controls
+            </h2>
+            <span class="collapse-icon text-gray-400">▼</span>
+          </div>
+          <div class="collapsible-content px-3 pb-3">
+            <div class="space-y-2">
+              <button id="startBtn" class="w-full py-2 px-3 bg-green-600 hover:bg-green-500 rounded-lg font-semibold transition-all text-sm">
+                ▶️ Start Training
+              </button>
+              <button id="pauseBtn" class="w-full py-2 px-3 bg-yellow-600 hover:bg-yellow-500 rounded-lg font-semibold transition-all text-sm" disabled>
+                ⏸️ Pause
+              </button>
+              <button id="resetBtn" class="w-full py-2 px-3 bg-red-600 hover:bg-red-500 rounded-lg font-semibold transition-all text-sm">
+                🔄 Reset Agent
+              </button>
+              <div class="flex gap-2">
+                <button id="speedDownBtn" class="flex-1 py-2 px-2 bg-slate-600 hover:bg-slate-500 rounded-lg transition-all text-xs">
+                  🐢 Slower
+                </button>
+                <button id="speedUpBtn" class="flex-1 py-2 px-2 bg-slate-600 hover:bg-slate-500 rounded-lg transition-all text-xs">
+                  🐇 Faster
+                </button>
+              </div>
+              <div class="text-center text-xs text-gray-400">
+                Speed: <span id="speedDisplay" class="text-blue-300">1x</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Hyperparameters -->
+        <div class="panel rounded-xl overflow-hidden">
+          <div class="collapsible-header p-3 flex items-center justify-between" onclick="togglePanel(this)">
+            <h2 class="text-base font-semibold text-blue-300 flex items-center gap-2">
+              <span>🎛️</span> Hyperparameters
+            </h2>
+            <span class="collapse-icon text-gray-400">▼</span>
+          </div>
+          <div class="collapsible-content px-3 pb-3">
+            <div class="space-y-2 text-xs">
+              <div>
+                <label class="text-gray-400">Learning Rate: <span id="lrValue" class="text-blue-300">0.001</span></label>
+                <input type="range" id="lrSlider" min="0.0001" max="0.01" step="0.0001" value="0.001" class="w-full h-2">
+              </div>
+              <div>
+                <label class="text-gray-400">Gamma (Discount): <span id="gammaValue" class="text-blue-300">0.99</span></label>
+                <input type="range" id="gammaSlider" min="0.9" max="0.999" step="0.001" value="0.99" class="w-full h-2">
+              </div>
+              <div>
+                <label class="text-gray-400">Epsilon Decay: <span id="epsilonDecayValue" class="text-blue-300">0.998</span></label>
+                <input type="range" id="epsilonDecaySlider" min="0.99" max="0.9999" step="0.0001" value="0.998" class="w-full h-2">
+              </div>
+              <div>
+                <label class="text-gray-400">Batch Size: <span id="batchValue" class="text-blue-300">64</span></label>
+                <input type="range" id="batchSlider" min="16" max="128" step="16" value="64" class="w-full h-2">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Legend -->
+        <div class="panel rounded-xl overflow-hidden">
+          <div class="collapsible-header p-3 flex items-center justify-between" onclick="togglePanel(this)">
+            <h2 class="text-base font-semibold text-blue-300">📋 Legend</h2>
+            <span class="collapse-icon text-gray-400">▼</span>
+          </div>
+          <div class="collapsible-content px-3 pb-3">
+            <div class="space-y-1 text-xs">
+              <div class="flex items-center gap-2">
+                <div class="w-5 h-5 bg-blue-500 rounded text-center">🤖</div>
+                <span>Agent (AI)</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <div class="w-5 h-5 bg-green-500 rounded text-center">🍎</div>
+                <span>Food (+10)</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <div class="w-5 h-5 bg-red-500 rounded text-center">👾</div>
+                <span>Enemy (-10)</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <div class="w-5 h-5 bg-gray-600 rounded"></div>
+                <span>Wall (-5)</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Training Stats -->
+        <div class="panel rounded-xl overflow-hidden">
+          <div class="collapsible-header p-3 flex items-center justify-between" onclick="togglePanel(this)">
+            <h2 class="text-base font-semibold text-blue-300 flex items-center gap-2">
+              <span>📈</span> Training Stats
+            </h2>
+            <span class="collapse-icon text-gray-400">▼</span>
+          </div>
+          <div class="collapsible-content px-3 pb-3">
+            <div class="space-y-1 text-xs">
+              <div class="flex justify-between">
+                <span class="text-gray-400">Episode:</span>
+                <span id="episodeStat" class="stat-value text-white">0</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-gray-400">Total Steps:</span>
+                <span id="stepsStat" class="stat-value text-white">0</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-gray-400">Epsilon (ε):</span>
+                <span id="epsilonStat" class="stat-value text-yellow-400">1.000</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-gray-400">Episode Reward:</span>
+                <span id="rewardStat" class="stat-value text-green-400">0.0</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-gray-400">Avg Reward (20 ep):</span>
+                <span id="avgRewardStat" class="stat-value text-blue-400">0.0</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-gray-400">Best Reward:</span>
+                <span id="bestRewardStat" class="stat-value text-purple-400">-∞</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-gray-400">Food Collected:</span>
+                <span id="foodStat" class="stat-value text-green-400">0</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-gray-400">Memory Buffer:</span>
+                <span id="memoryStat" class="stat-value text-cyan-400">0 / 10000</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-gray-400">Avg Loss:</span>
+                <span id="lossStat" class="stat-value text-orange-400">0.0000</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Center: Game Canvas -->
+      <div class="flex-1 flex flex-col items-center min-w-0">
+        <div class="panel rounded-xl p-2 md:p-3 mb-3">
+          <canvas id="gameCanvas" width="400" height="400" class="rounded-lg max-w-full"></canvas>
+        </div>
+        
+        <!-- Q-Values Display -->
+        <div class="panel rounded-xl overflow-hidden w-full max-w-md">
+          <div class="collapsible-header p-3 flex items-center justify-between" onclick="togglePanel(this)">
+            <h2 class="text-base font-semibold text-blue-300">🎯 Q-Values (Action Values)</h2>
+            <span class="collapse-icon text-gray-400">▼</span>
+          </div>
+          <div class="collapsible-content px-3 pb-3">
+            <div class="grid grid-cols-4 gap-2">
+              <div id="qUp" class="text-center p-2 bg-slate-700 rounded-lg">
+                <div class="text-xl">⬆️</div>
+                <div class="text-gray-400 text-xs">UP</div>
+                <div class="stat-value text-sm text-blue-300">0.00</div>
+              </div>
+              <div id="qDown" class="text-center p-2 bg-slate-700 rounded-lg">
+                <div class="text-xl">⬇️</div>
+                <div class="text-gray-400 text-xs">DOWN</div>
+                <div class="stat-value text-sm text-blue-300">0.00</div>
+              </div>
+              <div id="qLeft" class="text-center p-2 bg-slate-700 rounded-lg">
+                <div class="text-xl">⬅️</div>
+                <div class="text-gray-400 text-xs">LEFT</div>
+                <div class="stat-value text-sm text-blue-300">0.00</div>
+              </div>
+              <div id="qRight" class="text-center p-2 bg-slate-700 rounded-lg">
+                <div class="text-xl">➡️</div>
+                <div class="text-gray-400 text-xs">RIGHT</div>
+                <div class="stat-value text-sm text-blue-300">0.00</div>
+              </div>
+            </div>
+            <div id="chosenAction" class="mt-2 text-center text-xs text-gray-400">
+              Selected: <span class="text-green-400 font-semibold">-</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- State Vector -->
+        <div class="panel rounded-xl overflow-hidden w-full max-w-md mt-3">
+          <div class="collapsible-header p-3 flex items-center justify-between" onclick="togglePanel(this)">
+            <h2 class="text-base font-semibold text-blue-300">📊 State Vector (NN Input)</h2>
+            <span class="collapse-icon text-gray-400">▼</span>
+          </div>
+          <div class="collapsible-content px-3 pb-3">
+            <div id="stateVector" class="grid grid-cols-4 gap-1 text-xs">
+              <div class="text-center p-1 bg-slate-700 rounded">
+                <div class="text-gray-400">FoodΔX</div>
+                <div class="stat-value text-yellow-400">0.00</div>
+              </div>
+              <div class="text-center p-1 bg-slate-700 rounded">
+                <div class="text-gray-400">FoodΔY</div>
+                <div class="stat-value text-yellow-400">0.00</div>
+              </div>
+              <div class="text-center p-1 bg-slate-700 rounded">
+                <div class="text-gray-400">EnemyΔX</div>
+                <div class="stat-value text-red-400">0.00</div>
+              </div>
+              <div class="text-center p-1 bg-slate-700 rounded">
+                <div class="text-gray-400">EnemyΔY</div>
+                <div class="stat-value text-red-400">0.00</div>
+              </div>
+              <div class="text-center p-1 bg-slate-700 rounded">
+                <div class="text-gray-400">WallUp</div>
+                <div class="stat-value text-gray-300">0.00</div>
+              </div>
+              <div class="text-center p-1 bg-slate-700 rounded">
+                <div class="text-gray-400">WallDn</div>
+                <div class="stat-value text-gray-300">0.00</div>
+              </div>
+              <div class="text-center p-1 bg-slate-700 rounded">
+                <div class="text-gray-400">WallLt</div>
+                <div class="stat-value text-gray-300">0.00</div>
+              </div>
+              <div class="text-center p-1 bg-slate-700 rounded">
+                <div class="text-gray-400">WallRt</div>
+                <div class="stat-value text-gray-300">0.00</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Column: Brain Visualizer -->
+      <div class="xl:w-80 space-y-3 flex-shrink-0">
+        <!-- Brain Visualizer -->
+        <div class="panel rounded-xl overflow-hidden">
+          <div class="collapsible-header p-3 flex items-center justify-between" onclick="togglePanel(this)">
+            <h2 class="text-base font-semibold text-blue-300">🧠 Neural Network Visualizer</h2>
+            <span class="collapse-icon text-gray-400">▼</span>
+          </div>
+          <div class="collapsible-content px-3 pb-3">
+            <canvas id="brainCanvas" width="300" height="280" class="w-full rounded-lg bg-slate-800"></canvas>
+            <div class="mt-2 text-xs text-gray-500 text-center">
+              <span class="text-blue-400">●</span> Positive &nbsp;
+              <span class="text-red-400">●</span> Negative &nbsp;
+              <span class="text-green-400">●</span> Active
+            </div>
+            <div class="mt-1 text-xs text-gray-500 text-center">
+              Params: <span id="paramCount" class="text-blue-300">0</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Network Architecture -->
+        <div class="panel rounded-xl overflow-hidden">
+          <div class="collapsible-header p-3 flex items-center justify-between" onclick="togglePanel(this)">
+            <h2 class="text-base font-semibold text-blue-300">🏗️ Architecture</h2>
+            <span class="collapse-icon text-gray-400">▼</span>
+          </div>
+          <div class="collapsible-content px-3 pb-3">
+            <div class="flex justify-between items-center gap-1 text-xs">
+              <div class="network-layer rounded p-2 text-center flex-1">
+                <div class="text-gray-400">Input</div>
+                <div class="text-xl font-bold text-blue-400">8</div>
+              </div>
+              <div class="text-gray-500">→</div>
+              <div class="network-layer rounded p-2 text-center flex-1">
+                <div class="text-gray-400">H1</div>
+                <div class="text-xl font-bold text-purple-400">32</div>
+                <div class="text-gray-500 text-xs">ReLU</div>
+              </div>
+              <div class="text-gray-500">→</div>
+              <div class="network-layer rounded p-2 text-center flex-1">
+                <div class="text-gray-400">H2</div>
+                <div class="text-xl font-bold text-purple-400">32</div>
+                <div class="text-gray-500 text-xs">ReLU</div>
+              </div>
+              <div class="text-gray-500">→</div>
+              <div class="network-layer rounded p-2 text-center flex-1">
+                <div class="text-gray-400">Out</div>
+                <div class="text-xl font-bold text-green-400">4</div>
+                <div class="text-gray-500 text-xs">Linear</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Reward Chart -->
+        <div class="panel rounded-xl overflow-hidden">
+          <div class="collapsible-header p-3 flex items-center justify-between" onclick="togglePanel(this)">
+            <h2 class="text-base font-semibold text-blue-300">📉 Reward History</h2>
+            <span class="collapse-icon text-gray-400">▼</span>
+          </div>
+          <div class="collapsible-content px-3 pb-3">
+            <canvas id="rewardChart" height="120" class="w-full"></canvas>
+          </div>
+        </div>
+
+        <!-- Loss Chart -->
+        <div class="panel rounded-xl overflow-hidden">
+          <div class="collapsible-header p-3 flex items-center justify-between" onclick="togglePanel(this)">
+            <h2 class="text-base font-semibold text-blue-300">📊 Loss History</h2>
+            <span class="collapse-icon text-gray-400">▼</span>
+          </div>
+          <div class="collapsible-content px-3 pb-3">
+            <canvas id="lossChart" height="100" class="w-full"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="text-center mt-4 text-gray-500 text-xs">
+      <p>Deep Q-Learning with Target Network • Experience Replay • Pure JavaScript</p>
+    </footer>
+  </div>
+
+  <script>
+    // ============================================================
+    // COLLAPSIBLE PANELS
+    // ============================================================
+    function togglePanel(header) {
+      const content = header.nextElementSibling;
+      const icon = header.querySelector('.collapse-icon');
+      content.classList.toggle('collapsed');
+      icon.classList.toggle('collapsed');
+    }
+
+    // ============================================================
+    // CONFIGURATION
+    // ============================================================
+    const CONFIG = {
+      GRID_SIZE: 15,
+      CELL_SIZE: 26,
+      
+      // Lower learning rate for stability
+      LEARNING_RATE: 0.001,
+      GAMMA: 0.99,
+      
+      // Slower epsilon decay for better exploration
+      EPSILON_START: 1.0,
+      EPSILON_DECAY: 0.998,
+      EPSILON_MIN: 0.05,
+      
+      // Larger batch and memory
+      BATCH_SIZE: 64,
+      MEMORY_SIZE: 10000,
+      
+      // Target network update frequency
+      TARGET_UPDATE_FREQ: 100,
+      
+      // Start training after this many experiences
+      MIN_MEMORY_SIZE: 500,
+      
+      NUM_ENEMIES: 2,
+      STEPS_PER_EPISODE: 300,
+      SIMULATION_SPEED: 1
+    };
+
+    const ACTIONS = { UP: 0, RIGHT: 1, DOWN: 2, LEFT: 3 };
+    const ACTION_NAMES = ['UP', 'RIGHT', 'DOWN', 'LEFT'];
+    const ACTION_DELTAS = [
+      { dx: 0, dy: -1 },
+      { dx: 1, dy: 0 },
+      { dx: 0, dy: 1 },
+      { dx: -1, dy: 0 }
+    ];
+
+    // ============================================================
+    // NEURAL NETWORK - Fixed backpropagation
+    // ============================================================
+    class NeuralNetwork {
+      constructor(layerSizes) {
+        this.layerSizes = layerSizes;
+        this.numLayers = layerSizes.length;
+        this.weights = [];
+        this.biases = [];
+        
+        // Xavier/He initialization
+        for (let i = 0; i < this.numLayers - 1; i++) {
+          const fanIn = layerSizes[i];
+          const fanOut = layerSizes[i + 1];
+          const scale = Math.sqrt(2.0 / fanIn);
+          
+          const weightMatrix = [];
+          for (let j = 0; j < fanOut; j++) {
+            const row = [];
+            for (let k = 0; k < fanIn; k++) {
+              row.push((Math.random() * 2 - 1) * scale);
+            }
+            weightMatrix.push(row);
+          }
+          this.weights.push(weightMatrix);
+          
+          const biasVector = new Array(fanOut).fill(0);
+          this.biases.push(biasVector);
+        }
+        
+        this.activations = [];
+        this.zValues = [];
+      }
+      
+      relu(x) {
+        return Math.max(0, x);
+      }
+      
+      reluDerivative(x) {
+        return x > 0 ? 1 : 0;
+      }
+      
+      forward(input) {
+        this.activations = [input.slice()];
+        this.zValues = [];
+        
+        let current = input.slice();
+        
+        for (let layer = 0; layer < this.weights.length; layer++) {
+          const W = this.weights[layer];
+          const b = this.biases[layer];
+          const isOutput = layer === this.weights.length - 1;
+          
+          const z = [];
+          const a = [];
+          
+          for (let j = 0; j < W.length; j++) {
+            let sum = b[j];
+            for (let k = 0; k < current.length; k++) {
+              sum += W[j][k] * current[k];
+            }
+            z.push(sum);
+            a.push(isOutput ? sum : this.relu(sum));
+          }
+          
+          this.zValues.push(z);
+          this.activations.push(a);
+          current = a;
+        }
+        
+        return current;
+      }
+      
+      // Train on single experience with proper backprop
+      train(state, action, targetQ, learningRate) {
+        // Forward pass
+        const output = this.forward(state);
+        const predictedQ = output[action];
+        const error = predictedQ - targetQ;
+        const loss = error * error;
+        
+        // Clip error for stability
+        const clippedError = Math.max(-1, Math.min(1, error));
+        
+        // Initialize output gradient (only for the taken action)
+        let delta = new Array(output.length).fill(0);
+        delta[action] = clippedError;
+        
+        // Backpropagate through layers
+        for (let layer = this.weights.length - 1; layer >= 0; layer--) {
+          const aPrev = this.activations[layer];
+          const z = this.zValues[layer];
+          const isOutput = layer === this.weights.length - 1;
+          
+          // Apply activation derivative for hidden layers
+          const gradZ = [];
+          for (let j = 0; j < delta.length; j++) {
+            if (isOutput) {
+              gradZ.push(delta[j]);
+            } else {
+              gradZ.push(delta[j] * this.reluDerivative(z[j]));
+            }
+          }
+          
+          // Update weights and biases
+          for (let j = 0; j < this.weights[layer].length; j++) {
+            for (let k = 0; k < this.weights[layer][j].length; k++) {
+              this.weights[layer][j][k] -= learningRate * gradZ[j] * aPrev[k];
+            }
+            this.biases[layer][j] -= learningRate * gradZ[j];
+          }
+          
+          // Compute delta for previous layer
+          if (layer > 0) {
+            const newDelta = new Array(this.weights[layer][0].length).fill(0);
+            for (let k = 0; k < newDelta.length; k++) {
+              for (let j = 0; j < this.weights[layer].length; j++) {
+                newDelta[k] += this.weights[layer][j][k] * gradZ[j];
+              }
+            }
+            delta = newDelta;
+          }
+        }
+        
+        return loss;
+      }
+      
+      clone() {
+        const cloned = new NeuralNetwork(this.layerSizes);
+        for (let i = 0; i < this.weights.length; i++) {
+          for (let j = 0; j < this.weights[i].length; j++) {
+            for (let k = 0; k < this.weights[i][j].length; k++) {
+              cloned.weights[i][j][k] = this.weights[i][j][k];
+            }
+            cloned.biases[i][j] = this.biases[i][j];
+          }
+        }
+        return cloned;
+      }
+      
+      getParameterCount() {
+        let count = 0;
+        for (let i = 0; i < this.weights.length; i++) {
+          count += this.weights[i].length * this.weights[i][0].length;
+          count += this.biases[i].length;
+        }
+        return count;
+      }
+    }
+
+    // ============================================================
+    // REPLAY BUFFER
+    // ============================================================
+    class ReplayBuffer {
+      constructor(maxSize) {
+        this.maxSize = maxSize;
+        this.buffer = [];
+        this.position = 0;
+      }
+      
+      push(experience) {
+        if (this.buffer.length < this.maxSize) {
+          this.buffer.push(experience);
+        } else {
+          this.buffer[this.position] = experience;
+        }
+        this.position = (this.position + 1) % this.maxSize;
+      }
+      
+      sample(batchSize) {
+        const batch = [];
+        const n = Math.min(batchSize, this.buffer.length);
+        const indices = new Set();
+        
+        while (indices.size < n) {
+          indices.add(Math.floor(Math.random() * this.buffer.length));
+        }
+        
+        for (const i of indices) {
+          batch.push(this.buffer[i]);
+        }
+        return batch;
+      }
+      
+      size() { return this.buffer.length; }
+    }
+
+    // ============================================================
+    // ENVIRONMENT - Improved state and rewards
+    // ============================================================
+    class Environment {
+      constructor(gridSize) {
+        this.gridSize = gridSize;
+        this.reset();
+      }
+      
+      reset() {
+        // Start agent in center region
+        this.agent = {
+          x: Math.floor(this.gridSize / 4 + Math.random() * this.gridSize / 2),
+          y: Math.floor(this.gridSize / 4 + Math.random() * this.gridSize / 2)
+        };
+        
+        this.placeFood();
+        
+        this.enemies = [];
+        for (let i = 0; i < CONFIG.NUM_ENEMIES; i++) {
+          this.enemies.push(this.randomEmptyPosition());
+        }
+        
+        this.stepCount = 0;
+        this.done = false;
+        this.foodCollected = 0;
+        this.prevFoodDist = this.getFoodDistance();
+        
+        return this.getState();
+      }
+      
+      getFoodDistance() {
+        return Math.abs(this.food.x - this.agent.x) + Math.abs(this.food.y - this.agent.y);
+      }
+      
+      placeFood() {
+        do {
+          this.food = {
+            x: Math.floor(Math.random() * this.gridSize),
+            y: Math.floor(Math.random() * this.gridSize)
+          };
+        } while (this.food.x === this.agent.x && this.food.y === this.agent.y);
+      }
+      
+      randomEmptyPosition() {
+        let pos;
+        let attempts = 0;
+        do {
+          pos = {
+            x: Math.floor(Math.random() * this.gridSize),
+            y: Math.floor(Math.random() * this.gridSize)
+          };
+          attempts++;
+          if (attempts > 100) break;
+        } while (
+          (pos.x === this.agent.x && pos.y === this.agent.y) ||
+          (pos.x === this.food.x && pos.y === this.food.y)
+        );
+        return pos;
+      }
+      
+      // Improved state representation with wall distances
+      getState() {
+        let nearestEnemy = this.enemies[0];
+        let minDist = Infinity;
+        for (const enemy of this.enemies) {
+          const dist = Math.abs(enemy.x - this.agent.x) + Math.abs(enemy.y - this.agent.y);
+          if (dist < minDist) {
+            minDist = dist;
+            nearestEnemy = enemy;
+          }
+        }
+        
+        const gs = this.gridSize;
+        
+        return [
+          // Relative food position (normalized)
+          (this.food.x - this.agent.x) / gs,
+          (this.food.y - this.agent.y) / gs,
+          // Relative enemy position (normalized)
+          (nearestEnemy.x - this.agent.x) / gs,
+          (nearestEnemy.y - this.agent.y) / gs,
+          // Wall proximity (0 = at wall, 1 = far)
+          this.agent.y / (gs - 1),           // Distance to top wall
+          (gs - 1 - this.agent.y) / (gs - 1), // Distance to bottom wall
+          this.agent.x / (gs - 1),           // Distance to left wall
+          (gs - 1 - this.agent.x) / (gs - 1)  // Distance to right wall
+        ];
+      }
+      
+      step(action) {
+        const delta = ACTION_DELTAS[action];
+        const newX = this.agent.x + delta.dx;
+        const newY = this.agent.y + delta.dy;
+        
+        let reward = -0.01; // Very small step penalty
+        this.done = false;
+        
+        // Wall collision
+        if (newX < 0 || newX >= this.gridSize || newY < 0 || newY >= this.gridSize) {
+          reward = -5;
+          this.done = true;
+        } else {
+          this.agent.x = newX;
+          this.agent.y = newY;
+          
+          // Food collection
+          if (this.agent.x === this.food.x && this.agent.y === this.food.y) {
+            reward = 10;
+            this.foodCollected++;
+            this.placeFood();
+            this.prevFoodDist = this.getFoodDistance();
+          } else {
+            // Reward shaping: encourage moving toward food
+            const newFoodDist = this.getFoodDistance();
+            if (newFoodDist < this.prevFoodDist) {
+              reward += 0.1; // Bonus for getting closer
+            } else if (newFoodDist > this.prevFoodDist) {
+              reward -= 0.05; // Penalty for moving away
+            }
+            this.prevFoodDist = newFoodDist;
+          }
+          
+          // Enemy collision
+          for (const enemy of this.enemies) {
+            if (this.agent.x === enemy.x && this.agent.y === enemy.y) {
+              reward = -10;
+              this.done = true;
+              break;
+            }
+          }
+        }
+        
+        // Move enemies
+        if (!this.done) {
+          this.moveEnemies();
+          
+          // Check collision after enemy move
+          for (const enemy of this.enemies) {
+            if (this.agent.x === enemy.x && this.agent.y === enemy.y) {
+              reward = -10;
+              this.done = true;
+              break;
+            }
+          }
+        }
+        
+        this.stepCount++;
+        if (this.stepCount >= CONFIG.STEPS_PER_EPISODE) {
+          this.done = true;
+        }
+        
+        return { nextState: this.getState(), reward, done: this.done };
+      }
+      
+      moveEnemies() {
+        for (const enemy of this.enemies) {
+          if (Math.random() < 0.3) {
+            const direction = Math.floor(Math.random() * 4);
+            const delta = ACTION_DELTAS[direction];
+            const newX = enemy.x + delta.dx;
+            const newY = enemy.y + delta.dy;
+            
+            if (newX >= 0 && newX < this.gridSize && newY >= 0 && newY < this.gridSize) {
+              enemy.x = newX;
+              enemy.y = newY;
+            }
+          }
+        }
+      }
+    }
+
+    // ============================================================
+    // DQN AGENT with Target Network
+    // ============================================================
+    class DQNAgent {
+      constructor() {
+        // Main network (online)
+        this.network = new NeuralNetwork([8, 32, 32, 4]);
+        
+        // Target network (for stable Q-targets)
+        this.targetNetwork = this.network.clone();
+        
+        this.memory = new ReplayBuffer(CONFIG.MEMORY_SIZE);
+        this.epsilon = CONFIG.EPSILON_START;
+        
+        this.totalLoss = 0;
+        this.lossCount = 0;
+        this.trainStepCount = 0;
+      }
+      
+      selectAction(state) {
+        if (Math.random() < this.epsilon) {
+          return Math.floor(Math.random() * 4);
+        }
+        
+        const qValues = this.network.forward(state);
+        let bestAction = 0;
+        let bestValue = qValues[0];
+        for (let i = 1; i < qValues.length; i++) {
+          if (qValues[i] > bestValue) {
+            bestValue = qValues[i];
+            bestAction = i;
+          }
+        }
+        return bestAction;
+      }
+      
+      getQValues(state) {
+        return this.network.forward(state);
+      }
+      
+      remember(state, action, reward, nextState, done) {
+        this.memory.push({
+          state: state.slice(),
+          action,
+          reward,
+          nextState: nextState.slice(),
+          done
+        });
+      }
+      
+      train() {
+        if (this.memory.size() < CONFIG.MIN_MEMORY_SIZE) {
+          return 0;
+        }
+        
+        const batch = this.memory.sample(CONFIG.BATCH_SIZE);
+        let batchLoss = 0;
+        
+        for (const exp of batch) {
+          const { state, action, reward, nextState, done } = exp;
+          
+          let targetQ;
+          if (done) {
+            targetQ = reward;
+          } else {
+            // Use TARGET network for stable Q-value estimation
+            const nextQValues = this.targetNetwork.forward(nextState);
+            const maxNextQ = Math.max(...nextQValues);
+            targetQ = reward + CONFIG.GAMMA * maxNextQ;
+          }
+          
+          // Train main network
+          const loss = this.network.train(state, action, targetQ, CONFIG.LEARNING_RATE);
+          batchLoss += loss;
+        }
+        
+        this.trainStepCount++;
+        
+        // Update target network periodically
+        if (this.trainStepCount % CONFIG.TARGET_UPDATE_FREQ === 0) {
+          this.targetNetwork = this.network.clone();
+        }
+        
+        const avgLoss = batchLoss / batch.length;
+        this.totalLoss = this.totalLoss * 0.95 + avgLoss * 0.05;
+        this.lossCount++;
+        
+        return avgLoss;
+      }
+      
+      decayEpsilon() {
+        this.epsilon = Math.max(CONFIG.EPSILON_MIN, this.epsilon * CONFIG.EPSILON_DECAY);
+      }
+      
+      reset() {
+        this.network = new NeuralNetwork([8, 32, 32, 4]);
+        this.targetNetwork = this.network.clone();
+        this.memory = new ReplayBuffer(CONFIG.MEMORY_SIZE);
+        this.epsilon = CONFIG.EPSILON_START;
+        this.totalLoss = 0;
+        this.lossCount = 0;
+        this.trainStepCount = 0;
+      }
+    }
+
+    // ============================================================
+    // GAME CONTROLLER
+    // ============================================================
+    class Game {
+      constructor() {
+        this.canvas = document.getElementById('gameCanvas');
+        this.ctx = this.canvas.getContext('2d');
+        this.brainCanvas = document.getElementById('brainCanvas');
+        this.brainCtx = this.brainCanvas.getContext('2d');
+        this.chartCanvas = document.getElementById('rewardChart');
+        this.chartCtx = this.chartCanvas.getContext('2d');
+        this.lossChartCanvas = document.getElementById('lossChart');
+        this.lossChartCtx = this.lossChartCanvas.getContext('2d');
+        
+        this.env = new Environment(CONFIG.GRID_SIZE);
+        this.agent = new DQNAgent();
+        
+        this.isRunning = false;
+        this.episode = 0;
+        this.totalSteps = 0;
+        this.episodeReward = 0;
+        this.totalFoodCollected = 0;
+        this.rewardHistory = [];
+        this.lossHistory = [];
+        this.bestReward = -Infinity;
+        this.lastAction = null;
+        this.currentQValues = [0, 0, 0, 0];
+        
+        this.setupEventListeners();
+        this.resizeCharts();
+        this.updateUI();
+        this.render();
+        this.renderBrain();
+        this.renderChart();
+        this.renderLossChart();
+        
+        document.getElementById('paramCount').textContent = 
+          this.agent.network.getParameterCount().toLocaleString();
+      }
+      
+      resizeCharts() {
+        const resize = (canvas) => {
+          const container = canvas.parentElement;
+          if (container) {
+            canvas.width = container.clientWidth - 10;
+          }
+        };
+        resize(this.chartCanvas);
+        resize(this.lossChartCanvas);
+        resize(this.brainCanvas);
+      }
+      
+      setupEventListeners() {
+        document.getElementById('startBtn').addEventListener('click', () => this.start());
+        document.getElementById('pauseBtn').addEventListener('click', () => this.pause());
+        document.getElementById('resetBtn').addEventListener('click', () => this.reset());
+        document.getElementById('speedUpBtn').addEventListener('click', () => {
+          CONFIG.SIMULATION_SPEED = Math.min(16, CONFIG.SIMULATION_SPEED * 2);
+          document.getElementById('speedDisplay').textContent = CONFIG.SIMULATION_SPEED + 'x';
+        });
+        document.getElementById('speedDownBtn').addEventListener('click', () => {
+          CONFIG.SIMULATION_SPEED = Math.max(0.5, CONFIG.SIMULATION_SPEED / 2);
+          document.getElementById('speedDisplay').textContent = CONFIG.SIMULATION_SPEED + 'x';
+        });
+        
+        document.getElementById('lrSlider').addEventListener('input', (e) => {
+          CONFIG.LEARNING_RATE = parseFloat(e.target.value);
+          document.getElementById('lrValue').textContent = CONFIG.LEARNING_RATE.toFixed(4);
+        });
+        
+        document.getElementById('gammaSlider').addEventListener('input', (e) => {
+          CONFIG.GAMMA = parseFloat(e.target.value);
+          document.getElementById('gammaValue').textContent = CONFIG.GAMMA.toFixed(3);
+        });
+        
+        document.getElementById('epsilonDecaySlider').addEventListener('input', (e) => {
+          CONFIG.EPSILON_DECAY = parseFloat(e.target.value);
+          document.getElementById('epsilonDecayValue').textContent = CONFIG.EPSILON_DECAY.toFixed(4);
+        });
+        
+        document.getElementById('batchSlider').addEventListener('input', (e) => {
+          CONFIG.BATCH_SIZE = parseInt(e.target.value);
+          document.getElementById('batchValue').textContent = CONFIG.BATCH_SIZE;
+        });
+        
+        window.addEventListener('resize', () => this.resizeCharts());
+      }
+      
+      start() {
+        if (this.isRunning) return;
+        this.isRunning = true;
+        document.getElementById('startBtn').disabled = true;
+        document.getElementById('pauseBtn').disabled = false;
+        document.getElementById('startBtn').classList.add('training-active');
+        this.gameLoop();
+      }
+      
+      pause() {
+        this.isRunning = false;
+        document.getElementById('startBtn').disabled = false;
+        document.getElementById('pauseBtn').disabled = true;
+        document.getElementById('startBtn').classList.remove('training-active');
+      }
+      
+      reset() {
+        this.pause();
+        this.env.reset();
+        this.agent.reset();
+        this.episode = 0;
+        this.totalSteps = 0;
+        this.episodeReward = 0;
+        this.totalFoodCollected = 0;
+        this.rewardHistory = [];
+        this.lossHistory = [];
+        this.bestReward = -Infinity;
+        this.updateUI();
+        this.render();
+        this.renderBrain();
+        this.renderChart();
+        this.renderLossChart();
+      }
+      
+      gameLoop() {
+        if (!this.isRunning) return;
+        
+        const stepsPerFrame = Math.ceil(CONFIG.SIMULATION_SPEED);
+        for (let i = 0; i < stepsPerFrame; i++) {
+          this.step();
+        }
+        
+        this.updateUI();
+        this.render();
+        
+        if (this.totalSteps % 10 === 0) {
+          this.renderBrain();
+        }
+        
+        requestAnimationFrame(() => this.gameLoop());
+      }
+      
+      step() {
+        const state = this.env.getState();
+        const action = this.agent.selectAction(state);
+        this.lastAction = action;
+        this.currentQValues = this.agent.getQValues(state);
+        
+        const { nextState, reward, done } = this.env.step(action);
+        this.episodeReward += reward;
+        this.totalSteps++;
+        
+        this.agent.remember(state, action, reward, nextState, done);
+        
+        const loss = this.agent.train();
+        if (loss > 0 && this.totalSteps % 50 === 0) {
+          this.lossHistory.push(this.agent.totalLoss);
+          if (this.lossHistory.length > 200) this.lossHistory.shift();
+        }
+        
+        if (done) {
+          this.episode++;
+          this.totalFoodCollected += this.env.foodCollected;
+          this.rewardHistory.push(this.episodeReward);
+          
+          if (this.episodeReward > this.bestReward) {
+            this.bestReward = this.episodeReward;
+          }
+          
+          this.agent.decayEpsilon();
+          
+          if (this.episode % 5 === 0) {
+            this.renderChart();
+            this.renderLossChart();
+          }
+          
+          this.env.reset();
+          this.episodeReward = 0;
+        }
+      }
+      
+      updateUI() {
+        const state = this.env.getState();
+        const stateContainer = document.getElementById('stateVector');
+        const stateValues = stateContainer.querySelectorAll('.stat-value');
+        state.forEach((val, i) => {
+          if (stateValues[i]) stateValues[i].textContent = val.toFixed(2);
+        });
+        
+        document.getElementById('episodeStat').textContent = this.episode;
+        document.getElementById('stepsStat').textContent = this.totalSteps.toLocaleString();
+        document.getElementById('epsilonStat').textContent = this.agent.epsilon.toFixed(3);
+        document.getElementById('rewardStat').textContent = this.episodeReward.toFixed(1);
+        document.getElementById('foodStat').textContent = this.totalFoodCollected;
+        document.getElementById('memoryStat').textContent = 
+          `${this.agent.memory.size()} / ${CONFIG.MEMORY_SIZE}`;
+        document.getElementById('lossStat').textContent = this.agent.totalLoss.toFixed(4);
+        document.getElementById('bestRewardStat').textContent = 
+          this.bestReward === -Infinity ? '-∞' : this.bestReward.toFixed(1);
+        
+        const recentRewards = this.rewardHistory.slice(-20);
+        const avgReward = recentRewards.length > 0 
+          ? recentRewards.reduce((a, b) => a + b, 0) / recentRewards.length 
+          : 0;
+        document.getElementById('avgRewardStat').textContent = avgReward.toFixed(1);
+        
+        this.updateQValueDisplay();
+      }
+      
+      updateQValueDisplay() {
+        const qValues = this.currentQValues;
+        const maxQ = Math.max(...qValues);
+        const mapping = { 0: 'qUp', 1: 'qRight', 2: 'qDown', 3: 'qLeft' };
+        
+        for (let i = 0; i < 4; i++) {
+          const el = document.getElementById(mapping[i]);
+          const valueEl = el.querySelector('.stat-value');
+          valueEl.textContent = qValues[i].toFixed(2);
+          
+          el.classList.remove('ring-2', 'ring-green-400');
+          if (this.lastAction === i) {
+            el.classList.add('ring-2', 'ring-green-400');
+          }
+          
+          valueEl.classList.remove('text-blue-300', 'text-red-300', 'text-green-300');
+          if (qValues[i] === maxQ && qValues[i] > 0) {
+            valueEl.classList.add('text-green-300');
+          } else if (qValues[i] < 0) {
+            valueEl.classList.add('text-red-300');
+          } else {
+            valueEl.classList.add('text-blue-300');
+          }
+        }
+        
+        const actionName = this.lastAction !== null ? ACTION_NAMES[this.lastAction] : '-';
+        const mode = Math.random() < this.agent.epsilon ? 'exploring' : 'exploiting';
+        document.getElementById('chosenAction').innerHTML = 
+          `Selected: <span class="text-green-400 font-semibold">${actionName}</span> ` +
+          `<span class="text-gray-500">(${mode})</span>`;
+      }
+      
+      render() {
+        const ctx = this.ctx;
+        const cellSize = this.canvas.width / CONFIG.GRID_SIZE;
+        
+        ctx.fillStyle = '#1e293b';
+        ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        
+        ctx.strokeStyle = 'rgba(100, 116, 139, 0.2)';
+        ctx.lineWidth = 1;
+        for (let i = 0; i <= CONFIG.GRID_SIZE; i++) {
+          ctx.beginPath();
+          ctx.moveTo(i * cellSize, 0);
+          ctx.lineTo(i * cellSize, this.canvas.height);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(0, i * cellSize);
+          ctx.lineTo(this.canvas.width, i * cellSize);
+          ctx.stroke();
+        }
+        
+        // Food
+        ctx.fillStyle = '#22c55e';
+        ctx.fillRect(
+          this.env.food.x * cellSize + 2,
+          this.env.food.y * cellSize + 2,
+          cellSize - 4, cellSize - 4
+        );
+        ctx.font = `${cellSize * 0.6}px Arial`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('🍎',
+          this.env.food.x * cellSize + cellSize / 2,
+          this.env.food.y * cellSize + cellSize / 2
+        );
+        
+        // Enemies
+        for (const enemy of this.env.enemies) {
+          ctx.fillStyle = '#ef4444';
+          ctx.fillRect(
+            enemy.x * cellSize + 2,
+            enemy.y * cellSize + 2,
+            cellSize - 4, cellSize - 4
+          );
+          ctx.fillText('👾',
+            enemy.x * cellSize + cellSize / 2,
+            enemy.y * cellSize + cellSize / 2
+          );
+        }
+        
+        // Agent
+        ctx.fillStyle = '#3b82f6';
+        ctx.fillRect(
+          this.env.agent.x * cellSize + 2,
+          this.env.agent.y * cellSize + 2,
+          cellSize - 4, cellSize - 4
+        );
+        ctx.fillText('🤖',
+          this.env.agent.x * cellSize + cellSize / 2,
+          this.env.agent.y * cellSize + cellSize / 2
+        );
+        
+        // Vision lines
+        ctx.setLineDash([3, 3]);
+        ctx.lineWidth = 2;
+        
+        ctx.strokeStyle = 'rgba(34, 197, 94, 0.6)';
+        ctx.beginPath();
+        ctx.moveTo(
+          this.env.agent.x * cellSize + cellSize / 2,
+          this.env.agent.y * cellSize + cellSize / 2
+        );
+        ctx.lineTo(
+          this.env.food.x * cellSize + cellSize / 2,
+          this.env.food.y * cellSize + cellSize / 2
+        );
+        ctx.stroke();
+        
+        ctx.setLineDash([]);
+      }
+      
+      renderBrain() {
+        const ctx = this.brainCtx;
+        const w = this.brainCanvas.width;
+        const h = this.brainCanvas.height;
+        
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(0, 0, w, h);
+        
+        const layers = this.agent.network.layerSizes;
+        const activations = this.agent.network.activations.length > 0 
+          ? this.agent.network.activations 
+          : [new Array(8).fill(0), new Array(32).fill(0), new Array(32).fill(0), new Array(4).fill(0)];
+        
+        const layerX = [];
+        const layerSpacing = w / (layers.length + 1);
+        for (let i = 0; i < layers.length; i++) {
+          layerX.push(layerSpacing * (i + 1));
+        }
+        
+        const neuronRadius = 6;
+        const maxNeuronsShown = 12;
+        
+        // Draw connections first
+        ctx.lineWidth = 0.5;
+        for (let l = 0; l < layers.length - 1; l++) {
+          const n1 = Math.min(layers[l], maxNeuronsShown);
+          const n2 = Math.min(layers[l + 1], maxNeuronsShown);
+          const spacing1 = h / (n1 + 1);
+          const spacing2 = h / (n2 + 1);
+          
+          for (let i = 0; i < n1; i++) {
+            for (let j = 0; j < n2; j++) {
+              const y1 = spacing1 * (i + 1);
+              const y2 = spacing2 * (j + 1);
+              
+              // Get weight if available
+              let weight = 0;
+              if (this.agent.network.weights[l] && 
+                  this.agent.network.weights[l][j] && 
+                  this.agent.network.weights[l][j][i] !== undefined) {
+                weight = this.agent.network.weights[l][j][i];
+              }
+              
+              const alpha = Math.min(Math.abs(weight) * 0.5, 0.4);
+              if (weight > 0) {
+                ctx.strokeStyle = `rgba(59, 130, 246, ${alpha})`;
+              } else {
+                ctx.strokeStyle = `rgba(239, 68, 68, ${alpha})`;
+              }
+              
+              ctx.beginPath();
+              ctx.moveTo(layerX[l], y1);
+              ctx.lineTo(layerX[l + 1], y2);
+              ctx.stroke();
+            }
+          }
+        }
+        
+        // Draw neurons
+        for (let l = 0; l < layers.length; l++) {
+          const n = Math.min(layers[l], maxNeuronsShown);
+          const spacing = h / (n + 1);
+          
+          for (let i = 0; i < n; i++) {
+            const x = layerX[l];
+            const y = spacing * (i + 1);
+            
+            let activation = 0;
+            if (activations[l] && activations[l][i] !== undefined) {
+              activation = activations[l][i];
+            }
+            
+            // Neuron glow based on activation
+            const intensity = Math.min(Math.abs(activation), 1);
+            if (activation > 0.1) {
+              ctx.fillStyle = `rgba(34, 197, 94, ${intensity * 0.8})`;
+            } else if (activation < -0.1) {
+              ctx.fillStyle = `rgba(239, 68, 68, ${Math.abs(activation) * 0.8})`;
+            } else {
+              ctx.fillStyle = 'rgba(100, 116, 139, 0.5)';
+            }
+            
+            ctx.beginPath();
+            ctx.arc(x, y, neuronRadius + intensity * 3, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Neuron border
+            ctx.strokeStyle = '#64748b';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.arc(x, y, neuronRadius, 0, Math.PI * 2);
+            ctx.stroke();
+          }
+          
+          // Show "..." if truncated
+          if (layers[l] > maxNeuronsShown) {
+            ctx.fillStyle = '#64748b';
+            ctx.font = '10px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('...', layerX[l], h - 10);
+          }
+        }
+        
+        // Labels
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = '9px Arial';
+        ctx.textAlign = 'center';
+        const labels = ['Input', 'Hidden 1', 'Hidden 2', 'Output'];
+        for (let l = 0; l < layers.length; l++) {
+          ctx.fillText(labels[l], layerX[l], 12);
+          ctx.fillText(`(${layers[l]})`, layerX[l], 22);
+        }
+      }
+      
+      renderChart() {
+        const ctx = this.chartCtx;
+        const width = this.chartCanvas.width;
+        const height = this.chartCanvas.height;
+        
+        ctx.fillStyle = '#1e293b';
+        ctx.fillRect(0, 0, width, height);
+        
+        if (this.rewardHistory.length < 2) {
+          ctx.fillStyle = '#64748b';
+          ctx.font = '12px Arial';
+          ctx.textAlign = 'center';
+          ctx.fillText('Collecting data...', width / 2, height / 2);
+          return;
+        }
+        
+        const data = this.rewardHistory.slice(-100);
+        const minReward = Math.min(...data);
+        const maxReward = Math.max(...data);
+        const range = maxReward - minReward || 1;
+        
+        const margin = { left: 35, right: 10, top: 15, bottom: 15 };
+        const chartW = width - margin.left - margin.right;
+        const chartH = height - margin.top - margin.bottom;
+        
+        // Axes
+        ctx.strokeStyle = '#475569';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(margin.left, margin.top);
+        ctx.lineTo(margin.left, height - margin.bottom);
+        ctx.lineTo(width - margin.right, height - margin.bottom);
+        ctx.stroke();
+        
+        // Labels
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = '9px Arial';
+        ctx.textAlign = 'right';
+        ctx.fillText(maxReward.toFixed(0), margin.left - 3, margin.top + 5);
+        ctx.fillText(minReward.toFixed(0), margin.left - 3, height - margin.bottom);
+        
+        // Reward line
+        ctx.beginPath();
+        ctx.strokeStyle = '#3b82f6';
+        ctx.lineWidth = 1.5;
+        
+        const xStep = chartW / (data.length - 1);
+        data.forEach((reward, i) => {
+          const x = margin.left + i * xStep;
+          const y = height - margin.bottom - ((reward - minReward) / range) * chartH;
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        });
+        ctx.stroke();
+        
+        // Moving average
+        if (data.length >= 10) {
+          ctx.beginPath();
+          ctx.strokeStyle = '#22c55e';
+          ctx.lineWidth = 2;
+          
+          for (let i = 9; i < data.length; i++) {
+            const slice = data.slice(i - 9, i + 1);
+            const avg = slice.reduce((a, b) => a + b, 0) / slice.length;
+            const x = margin.left + i * xStep;
+            const y = height - margin.bottom - ((avg - minReward) / range) * chartH;
+            if (i === 9) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+          }
+          ctx.stroke();
+        }
+      }
+      
+      renderLossChart() {
+        const ctx = this.lossChartCtx;
+        const width = this.lossChartCanvas.width;
+        const height = this.lossChartCanvas.height;
+        
+        ctx.fillStyle = '#1e293b';
+        ctx.fillRect(0, 0, width, height);
+        
+        if (this.lossHistory.length < 2) {
+          ctx.fillStyle = '#64748b';
+          ctx.font = '12px Arial';
+          ctx.textAlign = 'center';
+          ctx.fillText('Training...', width / 2, height / 2);
+          return;
+        }
+        
+        const data = this.lossHistory;
+        const maxLoss = Math.max(...data);
+        const minLoss = Math.min(...data);
+        const range = maxLoss - minLoss || 1;
+        
+        const margin = { left: 35, right: 10, top: 10, bottom: 10 };
+        const chartW = width - margin.left - margin.right;
+        const chartH = height - margin.top - margin.bottom;
+        
+        ctx.strokeStyle = '#475569';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(margin.left, margin.top);
+        ctx.lineTo(margin.left, height - margin.bottom);
+        ctx.lineTo(width - margin.right, height - margin.bottom);
+        ctx.stroke();
+        
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = '9px Arial';
+        ctx.textAlign = 'right';
+        ctx.fillText(maxLoss.toFixed(3), margin.left - 3, margin.top + 5);
+        ctx.fillText(minLoss.toFixed(3), margin.left - 3, height - margin.bottom);
+        
+        ctx.beginPath();
+        ctx.strokeStyle = '#f97316';
+        ctx.lineWidth = 1.5;
+        
+        const xStep = chartW / (data.length - 1);
+        data.forEach((loss, i) => {
+          const x = margin.left + i * xStep;
+          const y = height - margin.bottom - ((loss - minLoss) / range) * chartH;
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        });
+        ctx.stroke();
+      }
+    }
+
+    // ============================================================
+    // INITIALIZATION
+    // ============================================================
+    document.addEventListener('DOMContentLoaded', () => {
+      window.game = new Game();
+      
+      console.log('%c🧠 Deep Q Grid Hunter v2.0', 'color: #60a5fa; font-size: 16px; font-weight: bold;');
+      console.log('%cFixed: Target Network, Improved Backprop, Reward Shaping', 'color: #22c55e;');
+    });
+  </script>
+</body>
+</html>
