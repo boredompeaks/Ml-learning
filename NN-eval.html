@@ -70,8 +70,6 @@
         .canvas-container {
             position: relative;
             transform-origin: 0 0;
-            width: 1400px;
-            height: 800px;
         }
         #mainCanvas {
             display: block;
@@ -282,25 +280,6 @@
             border-radius: 2px;
             color: #00f5ff;
         }
-        .mode-indicator {
-            font-size: 0.55em;
-            padding: 2px 6px;
-            border-radius: 3px;
-            margin-top: 4px;
-            text-align: center;
-        }
-        .mode-indicator.pooled {
-            background: rgba(0, 245, 255, 0.2);
-            color: #00f5ff;
-            border: 1px solid #00f5ff;
-        }
-        .mode-indicator.individual {
-            background: rgba(255, 136, 0, 0.2);
-            color: #ff8800;
-            border: 1px solid #ff8800;
-        }
-        .toggle.orange { background: #ff8800; }
-        /* Toast notifications */
         .toast {
             position: fixed;
             top: 20px;
@@ -324,6 +303,21 @@
             from { opacity: 1; transform: translateX(-50%) translateY(0); }
             to { opacity: 0; transform: translateX(-50%) translateY(-20px); }
         }
+        .drawing-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #00f5ff;
+            font-size: 1.5em;
+            z-index: 50;
+            pointer-events: none;
+        }
     </style>
 </head>
 <body>
@@ -344,11 +338,12 @@
             <div class="panel">
                 <div class="panel-title">Track Editor</div>
                 <div class="btn-group">
-                    <button class="btn full" id="drawBtn" onclick="toggleDrawMode()">✏️ Draw Track (Auto Walls)</button>
+                    <button class="btn full" id="drawBtn" onclick="toggleDrawMode()">✏️ Draw Track</button>
                 </div>
                 <div class="drawing-info" id="drawingInfo">
-                    <strong>Drawing Mode!</strong> Click & drag centerline.<br>
-                    Release to create track segment.
+                    <strong>Drawing Mode Active!</strong><br>
+                    Draw a closed loop. Connect end to start.<br>
+                    Simulation paused until track is drawn.
                 </div>
                 <div class="btn-group">
                     <button class="btn" onclick="generateRandomTrack()">🎲 Random</button>
@@ -507,6 +502,18 @@
                     <button class="btn full" onclick="downloadWeights()">💾 Download</button>
                 </div>
             </div>
+            
+            <div class="panel">
+                <div class="panel-title">Similar Projects</div>
+                <div style="font-size: 0.55em; color: #888; line-height: 1.6;">
+                    • Flappy Bird AI (NEAT)<br>
+                    • Lunar Lander RL<br>
+                    • Robot Arm IK Learning<br>
+                    • Creature Evolution (Box2D)<br>
+                    • Snake AI (Q-Learning)<br>
+                    • Drone Swarm Optimization
+                </div>
+            </div>
         </div>
     </div>
 
@@ -528,7 +535,7 @@
             TRACK_WIDTH: 45
         };
 
-        // ============== NEURAL NETWORK (Simpler: 5→8→2) ==============
+        // ============== NEURAL NETWORK ==============
         class Brain {
             constructor() {
                 this.w1 = this.randMatrix(8, 5);
@@ -558,7 +565,6 @@
             forward(inputs, int8 = false) {
                 this.activations.input = [...inputs];
                 
-                // Hidden layer
                 const hidden = [];
                 for (let j = 0; j < 8; j++) {
                     let sum = int8 ? this.quantize(this.b1[j]) : this.b1[j];
@@ -572,7 +578,6 @@
                 }
                 this.activations.hidden = hidden;
                 
-                // Output layer
                 const output = [];
                 for (let j = 0; j < 2; j++) {
                     let sum = int8 ? this.quantize(this.b2[j]) : this.b2[j];
@@ -625,10 +630,6 @@
             toJSON() {
                 return JSON.stringify({ w1: this.w1, b1: this.b1, w2: this.w2, b2: this.b2 });
             }
-            
-            getWeightCount() {
-                return 8 * 5 + 8 + 2 * 8 + 2; // 58 params
-            }
         }
 
         // ============== RAY-LINE INTERSECTION ==============
@@ -657,10 +658,19 @@
                 this.startAngle = 0;
                 this.centerline = [];
                 this.optimalLine = [];
+                this.crossingZone = null; // For figure-8 2.5D effect
             }
             
             addPath(points, level = 0) {
                 if (points.length < 3) return;
+                
+                // Close the loop if not already closed
+                const first = points[0];
+                const last = points[points.length - 1];
+                const dist = Math.sqrt((first.x - last.x)**2 + (first.y - last.y)**2);
+                if (dist > 10) {
+                    points.push({ x: first.x, y: first.y });
+                }
                 
                 const smoothed = this.smoothPoints(points);
                 this.paths.push({ points: smoothed, level });
@@ -681,9 +691,9 @@
                 if (pts.length < 3) return pts;
                 const result = [];
                 for (let i = 0; i < pts.length; i++) {
-                    const p = pts[Math.max(0, i-1)];
+                    const p = pts[(i - 1 + pts.length) % pts.length];
                     const c = pts[i];
-                    const n = pts[Math.min(pts.length-1, i+1)];
+                    const n = pts[(i + 1) % pts.length];
                     result.push({
                         x: (p.x + c.x * 2 + n.x) / 4,
                         y: (p.y + c.y * 2 + n.y) / 4
@@ -700,9 +710,8 @@
                     const pts = path.points;
                     const w = CONFIG.TRACK_WIDTH;
                     
-                    if (pts.length < 2) return;
+                    if (pts.length < 3) return;
                     
-                    // Build continuous wall points to avoid gaps
                     const leftWall = [];
                     const rightWall = [];
                     
@@ -711,7 +720,6 @@
                         const curr = pts[i];
                         const next = pts[(i + 1) % pts.length];
                         
-                        // Calculate averaged normal at this point for smooth corners
                         const dx1 = curr.x - prev.x;
                         const dy1 = curr.y - prev.y;
                         const dx2 = next.x - curr.x;
@@ -720,7 +728,6 @@
                         const len1 = Math.sqrt(dx1*dx1 + dy1*dy1) || 1;
                         const len2 = Math.sqrt(dx2*dx2 + dy2*dy2) || 1;
                         
-                        // Average the normals
                         const nx1 = -dy1 / len1;
                         const ny1 = dx1 / len1;
                         const nx2 = -dy2 / len2;
@@ -736,7 +743,7 @@
                         rightWall.push({ x: curr.x - nx * w, y: curr.y - ny * w });
                     }
                     
-                    // Create wall segments from the computed points (closed loop)
+                    // Create closed wall segments
                     for (let i = 0; i < leftWall.length; i++) {
                         const next = (i + 1) % leftWall.length;
                         
@@ -752,7 +759,7 @@
                         });
                     }
                     
-                    // Checkpoints along the path
+                    // Checkpoints
                     const cpInterval = Math.max(1, Math.floor(pts.length / 12));
                     for (let i = 0; i < pts.length; i += cpInterval) {
                         this.checkpoints.push({
@@ -766,7 +773,6 @@
             }
             
             calculateOptimalLine() {
-                // Calculate racing line (apexes)
                 this.optimalLine = [];
                 const pts = this.centerline;
                 if (pts.length < 5) return;
@@ -776,12 +782,10 @@
                     const curr = pts[i];
                     const next = pts[(i + 2) % pts.length];
                     
-                    // Calculate curvature direction
                     const dx1 = curr.x - prev.x, dy1 = curr.y - prev.y;
                     const dx2 = next.x - curr.x, dy2 = next.y - curr.y;
                     const cross = dx1 * dy2 - dy1 * dx2;
                     
-                    // Offset toward inside of curve
                     const len = Math.sqrt(dx2*dx2 + dy2*dy2) || 1;
                     const nx = -dy2 / len, ny = dx2 / len;
                     const offset = Math.sign(cross) * CONFIG.TRACK_WIDTH * 0.3;
@@ -799,6 +803,7 @@
                 this.checkpoints = [];
                 this.centerline = [];
                 this.optimalLine = [];
+                this.crossingZone = null;
             }
         }
 
@@ -832,7 +837,6 @@
                 this.sensors = new Array(CONFIG.SENSOR_COUNT).fill(1);
                 this.sensorHits = [];
                 this.path = [];
-                this.currentLevel = 0;
             }
             
             updateSensors(walls) {
@@ -892,13 +896,13 @@
                 this.x += this.vx;
                 this.y += this.vy;
                 
-                // Boundary check - kill if outside canvas
+                // Boundary check
                 if (this.x < 0 || this.x > mainCanvas.width || this.y < 0 || this.y > mainCanvas.height) {
                     this.alive = false;
                     return;
                 }
                 
-                // Track path for visualization
+                // Track path
                 if (frameCount % 3 === 0) {
                     this.path.push({ x: this.x, y: this.y });
                     if (this.path.length > 300) this.path.shift();
@@ -936,21 +940,15 @@
                     }
                 }
                 
-                // Calculate average speed (distance / time)
                 this.avgSpeed = this.lapTime > 0 ? this.distance / this.lapTime : 0;
                 
-                // Fitness calculation with speed priority option
                 const checkpointScore = (this.laps * cps.length + this.cpIndex) * 500;
                 const distanceScore = this.distance * 0.1;
                 
-                // Speed bonuses - heavily reward faster agents when speedPriority is on
                 let speedScore = 0;
                 if (speedPriority) {
-                    // Reward average speed significantly
                     speedScore = this.avgSpeed * 200;
-                    // Bonus for maintaining high speed
                     speedScore += this.maxSpeed * 100;
-                    // Penalty for being too slow (below 40% max speed average)
                     if (this.avgSpeed < CONFIG.MAX_SPEED * 0.4 && this.lapTime > 100) {
                         speedScore -= (CONFIG.MAX_SPEED * 0.4 - this.avgSpeed) * 150;
                     }
@@ -960,9 +958,7 @@
                 
                 this.fitness = checkpointScore + distanceScore + speedScore;
                 
-                // Lap completion bonus - faster laps get much higher scores
                 if (this.laps > 0 && this.bestLap < Infinity) {
-                    // Invert lap time so faster = higher score
                     const lapBonus = 15000 / this.bestLap * this.laps;
                     this.fitness += lapBonus;
                 }
@@ -1015,7 +1011,6 @@
                 
                 ctx.restore();
                 
-                // Draw sensors for best
                 if (isBest && this.alive && showSensors) {
                     const halfSpread = CONFIG.SENSOR_SPREAD / 2;
                     const step = CONFIG.SENSOR_SPREAD / (CONFIG.SENSOR_COUNT - 1);
@@ -1044,7 +1039,7 @@
             }
         }
 
-        // ============== TOAST SYSTEM ==============
+        // ============== TOAST ==============
         function showToast(message, type = 'success') {
             const existing = document.querySelector('.toast');
             if (existing) existing.remove();
@@ -1065,7 +1060,7 @@
 
         function checkOptimalLineProximity() {
             if (allTimeBestPath.length < 20 || track.optimalLine.length < 20) return;
-            if (generation - lastOptimalToastGen < 5) return; // Don't spam toasts
+            if (generation - lastOptimalToastGen < 5) return;
             
             let totalDistance = 0;
             const sampleCount = Math.min(30, allTimeBestPath.length, track.optimalLine.length);
@@ -1109,7 +1104,14 @@
                 });
             }
             track.addPath(pts, 0);
-            resetAgentsOnly();
+            
+            // Exit draw mode and start simulation
+            if (drawMode) toggleDrawMode();
+            generation = 1;
+            frameCount = 0;
+            fitnessHistory = [];
+            spawnAgents();
+            showToast('🏁 Oval track generated!', 'info');
         }
         
         function generateFigure8() {
@@ -1118,22 +1120,32 @@
             
             const cx = mainCanvas.width / 2;
             const cy = mainCanvas.height / 2;
-            const scale = Math.min(mainCanvas.width, mainCanvas.height) * 0.3;
+            const scaleX = mainCanvas.width * 0.35;
+            const scaleY = mainCanvas.height * 0.35;
             
             const pts = [];
-            const steps = 100;
+            const steps = 120;
             
-            // Lemniscate (proper figure-8)
+            // Figure-8 using lemniscate shape (stretched)
             for (let i = 0; i < steps; i++) {
                 const t = (i / steps) * Math.PI * 2;
-                // Parametric lemniscate of Gerono
-                const x = Math.cos(t) * scale;
-                const y = Math.sin(t) * Math.cos(t) * scale;
+                // Modified lemniscate for better shape
+                const x = Math.sin(t) * scaleX;
+                const y = Math.sin(t) * Math.cos(t) * scaleY * 1.5;
                 pts.push({ x: cx + x, y: cy + y });
             }
             
+            // Mark crossing zone for 2.5D effect
+            track.crossingZone = { x: cx, y: cy, radius: CONFIG.TRACK_WIDTH * 2 };
+            
             track.addPath(pts, 0);
-            resetAgentsOnly();
+            
+            if (drawMode) toggleDrawMode();
+            generation = 1;
+            frameCount = 0;
+            fitnessHistory = [];
+            spawnAgents();
+            showToast('∞ Figure-8 track generated!', 'info');
         }
         
         function generateRandomTrack() {
@@ -1154,10 +1166,15 @@
                 });
             }
             
-            // Catmull-Rom spline
             const smooth = catmullRom(pts, 8, true);
             track.addPath(smooth, 0);
-            resetAgentsOnly();
+            
+            if (drawMode) toggleDrawMode();
+            generation = 1;
+            frameCount = 0;
+            fitnessHistory = [];
+            spawnAgents();
+            showToast('🎲 Random track generated!', 'info');
         }
         
         function catmullRom(pts, detail, closed) {
@@ -1185,7 +1202,6 @@
         function evolve() {
             const sorted = [...agents].sort((a, b) => b.fitness - a.fitness);
             
-            // Record history
             const avgFit = agents.reduce((s, a) => s + a.fitness, 0) / agents.length;
             const bestFit = sorted[0].fitness;
             const lapsThisGen = agents.reduce((s, a) => s + a.laps, 0);
@@ -1195,50 +1211,38 @@
             fitnessHistory.push({ avg: avgFit, best: bestFit, laps: lapsThisGen, avgSpeed: avgSpd });
             if (fitnessHistory.length > 80) fitnessHistory.shift();
             
-            // Save best brain
             bestBrain = sorted[0].brain.clone();
             
-            // Update best paths - use the agent with most checkpoints/best lap
+            // Update racing lines - always track best alive agent's path
             const bestPathAgent = sorted[0];
             if (bestPathAgent.path.length > 10) {
                 currentBestPath = [...bestPathAgent.path];
                 
-                // Update all-time best if this agent completed a lap or has better progress
-                if (bestPathAgent.laps > 0 || 
-                    (bestPathAgent.cpIndex > 0 && bestPathAgent.path.length > allTimeBestPath.length * 0.8)) {
-                    if (bestPathAgent.laps > 0 && bestPathAgent.bestLap < bestLapTime) {
-                        allTimeBestPath = [...bestPathAgent.path];
-                        bestLapTime = bestPathAgent.bestLap;
-                    } else if (allTimeBestPath.length === 0 && bestPathAgent.path.length > 50) {
-                        allTimeBestPath = [...bestPathAgent.path];
-                    }
+                if (bestPathAgent.laps > 0 && bestPathAgent.bestLap < bestLapTime) {
+                    allTimeBestPath = [...bestPathAgent.path];
+                    bestLapTime = bestPathAgent.bestLap;
+                } else if (allTimeBestPath.length === 0 && bestPathAgent.path.length > 50) {
+                    allTimeBestPath = [...bestPathAgent.path];
                 }
             }
             
-            // Check if near optimal
             checkOptimalLineProximity();
             
-            // Create new generation
             const newBrains = [];
             
-            // Elitism - keep top performers unchanged
             for (let i = 0; i < CONFIG.ELITE_COUNT; i++) {
                 newBrains.push(sorted[i].brain.clone());
             }
             
             if (useCrossover) {
-                // POOLED LEARNING: Crossover + Mutation
-                // Breed rest with tournament selection
                 while (newBrains.length < CONFIG.AGENT_COUNT) {
                     if (Math.random() < 0.7) {
-                        // Crossover between two fit parents
                         const a = tournament(sorted);
                         const b = tournament(sorted);
                         const child = Brain.crossover(a.brain, b.brain);
                         child.mutate(CONFIG.MUTATION_RATE, CONFIG.MUTATION_AMT);
                         newBrains.push(child);
                     } else {
-                        // Clone best and mutate more aggressively
                         const parent = tournament(sorted);
                         const child = parent.brain.clone();
                         child.mutate(CONFIG.MUTATION_RATE * 1.5, CONFIG.MUTATION_AMT * 1.2);
@@ -1246,15 +1250,11 @@
                     }
                 }
             } else {
-                // INDIVIDUAL LEARNING: No crossover, only mutation from elite
-                // Each agent learns independently - prevents slow gene contamination
                 while (newBrains.length < CONFIG.AGENT_COUNT) {
-                    // Select from top performers with strong bias toward best
                     const parentIdx = Math.floor(Math.pow(Math.random(), 3) * Math.min(15, sorted.length));
                     const parent = sorted[parentIdx];
                     const child = parent.brain.clone();
                     
-                    // More aggressive mutation for exploration
                     const mutRate = CONFIG.MUTATION_RATE * (1 + parentIdx * 0.1);
                     const mutAmt = CONFIG.MUTATION_AMT * (1 + parentIdx * 0.05);
                     child.mutate(mutRate, mutAmt);
@@ -1262,7 +1262,6 @@
                 }
             }
             
-            // Adaptive mutation - increase if stagnating, decrease if improving
             if (fitnessHistory.length > 10) {
                 const recent = fitnessHistory.slice(-10);
                 const older = fitnessHistory.slice(-20, -10);
@@ -1273,11 +1272,9 @@
                 const improvement = recentBest - olderBest;
                 
                 if (improvement < 50) {
-                    // Stagnating - increase exploration
                     CONFIG.MUTATION_RATE = Math.min(0.35, CONFIG.MUTATION_RATE + 0.01);
                     CONFIG.MUTATION_AMT = Math.min(0.6, CONFIG.MUTATION_AMT + 0.02);
                 } else if (improvement > 200) {
-                    // Improving well - focus exploitation
                     CONFIG.MUTATION_RATE = Math.max(0.08, CONFIG.MUTATION_RATE - 0.01);
                     CONFIG.MUTATION_AMT = Math.max(0.2, CONFIG.MUTATION_AMT - 0.01);
                 }
@@ -1285,7 +1282,6 @@
                 document.getElementById('mutRate').textContent = Math.round(CONFIG.MUTATION_RATE * 100) + '%';
             }
             
-            // Check for speed degradation and warn
             if (fitnessHistory.length > 20) {
                 const recentSpeeds = fitnessHistory.slice(-10).map(f => f.avgSpeed || 0);
                 const olderSpeeds = fitnessHistory.slice(-20, -10).map(f => f.avgSpeed || 0);
@@ -1293,7 +1289,7 @@
                 const olderAvg = olderSpeeds.reduce((a,b) => a+b, 0) / olderSpeeds.length;
                 
                 if (olderAvg > 0 && recentAvg < olderAvg * 0.7 && generation % 10 === 0) {
-                    showToast('⚠️ Speed degrading! Try Individual Learning mode', 'warning');
+                    showToast('⚠️ Speed degrading! Try Individual Learning', 'warning');
                 }
             }
             
@@ -1303,10 +1299,8 @@
         }
         
         function tournament(sortedAgents, size = 5) {
-            // Tournament selection from pre-sorted agents (biased toward top)
             let bestIdx = sortedAgents.length - 1;
             for (let i = 0; i < size; i++) {
-                // Exponential distribution favoring top agents
                 const idx = Math.floor(Math.pow(Math.random(), 2) * sortedAgents.length);
                 if (idx < bestIdx) bestIdx = idx;
             }
@@ -1323,7 +1317,7 @@
         function toggleSpeedPriority() {
             speedPriority = !speedPriority;
             document.getElementById('toggleSpeedPriority').classList.toggle('active', speedPriority);
-            showToast(speedPriority ? '🏎️ Speed Priority ON - Fast agents rewarded!' : '🐢 Speed Priority OFF - Survival focus', 'info');
+            showToast(speedPriority ? '🏎️ Speed Priority ON!' : '🐢 Speed Priority OFF', 'info');
         }
 
         // ============== VISUALIZATION ==============
@@ -1343,6 +1337,33 @@
                 ctx.stroke();
             });
             
+            // Draw 2.5D crossing effect for figure-8
+            if (track.crossingZone) {
+                const cz = track.crossingZone;
+                // Draw bridge shadow
+                ctx.fillStyle = 'rgba(0,0,0,0.4)';
+                ctx.beginPath();
+                ctx.ellipse(cz.x + 5, cz.y + 8, cz.radius * 1.2, cz.radius * 0.6, 0, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Draw bridge deck
+                const gradient = ctx.createLinearGradient(cz.x - cz.radius, cz.y, cz.x + cz.radius, cz.y);
+                gradient.addColorStop(0, '#2a2a5a');
+                gradient.addColorStop(0.5, '#3a3a7a');
+                gradient.addColorStop(1, '#2a2a5a');
+                ctx.fillStyle = gradient;
+                ctx.beginPath();
+                ctx.ellipse(cz.x, cz.y - 5, cz.radius * 1.1, cz.radius * 0.5, 0, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Bridge rails
+                ctx.strokeStyle = '#ff6600';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.ellipse(cz.x, cz.y - 8, cz.radius * 1.15, cz.radius * 0.55, 0, Math.PI * 0.1, Math.PI * 0.9);
+                ctx.stroke();
+            }
+            
             // Draw walls
             track.walls.forEach(w => {
                 ctx.strokeStyle = w.level === 0 ? '#00aaff' : '#ff6600';
@@ -1353,13 +1374,11 @@
                 ctx.lineTo(w.x2, w.y2);
                 ctx.stroke();
                 
-                // Glow
                 ctx.strokeStyle = w.level === 0 ? 'rgba(0,170,255,0.2)' : 'rgba(255,100,0,0.2)';
                 ctx.lineWidth = 6;
                 ctx.stroke();
             });
             
-            // Checkpoints
             if (displayOpts.checkpoints) {
                 track.checkpoints.forEach((cp, i) => {
                     ctx.fillStyle = `hsla(${i * 25}, 80%, 50%, 0.15)`;
@@ -1374,7 +1393,6 @@
                 });
             }
             
-            // Start line
             if (track.paths.length > 0) {
                 ctx.save();
                 ctx.translate(track.startX, track.startY);
@@ -1388,9 +1406,7 @@
                 ctx.restore();
             }
             
-            // Racing lines
             if (displayOpts.racingLine) {
-                // All-time best (green)
                 if (allTimeBestPath.length > 1) {
                     ctx.strokeStyle = 'rgba(0, 255, 136, 0.5)';
                     ctx.lineWidth = 2;
@@ -1400,7 +1416,6 @@
                     ctx.stroke();
                 }
                 
-                // Current best (yellow)
                 if (currentBestPath.length > 1) {
                     ctx.strokeStyle = 'rgba(255, 255, 0, 0.4)';
                     ctx.lineWidth = 2;
@@ -1412,7 +1427,6 @@
                     ctx.setLineDash([]);
                 }
                 
-                // Optimal racing line (magenta)
                 if (track.optimalLine.length > 1) {
                     ctx.strokeStyle = 'rgba(255, 0, 255, 0.3)';
                     ctx.lineWidth = 1;
@@ -1443,7 +1457,6 @@
                 }
             }
             
-            // Connections layer 1
             ctx.lineWidth = 0.5;
             for (let i = 0; i < 5; i++) {
                 for (let j = 0; j < 8; j++) {
@@ -1459,7 +1472,6 @@
                 }
             }
             
-            // Connections layer 2
             for (let i = 0; i < 8; i++) {
                 for (let j = 0; j < 2; j++) {
                     const act = Math.abs((brain.activations.hidden[i] || 0) * (brain.activations.output[j] || 0));
@@ -1474,7 +1486,6 @@
                 }
             }
             
-            // Nodes
             for (let l = 0; l < 3; l++) {
                 const acts = l === 0 ? brain.activations.input : (l === 1 ? brain.activations.hidden : brain.activations.output);
                 for (let n = 0; n < layers[l]; n++) {
@@ -1487,7 +1498,6 @@
                 }
             }
             
-            // Labels
             ctx.fillStyle = '#555';
             ctx.font = '8px sans-serif';
             ctx.textAlign = 'center';
@@ -1503,7 +1513,6 @@
             
             const sx = w / mainCanvas.width, sy = h / mainCanvas.height;
             
-            // Mini track
             ctx.strokeStyle = '#222';
             ctx.lineWidth = 0.5;
             track.walls.forEach(wall => {
@@ -1513,7 +1522,6 @@
                 ctx.stroke();
             });
             
-            // Heat
             const heat = new Map();
             const gs = 3;
             
@@ -1550,7 +1558,6 @@
             const cw = w - pad * 2, ch = h - pad * 2;
             const step = cw / Math.max(fitnessHistory.length - 1, 1);
             
-            // Avg line
             ctx.strokeStyle = '#00f5ff';
             ctx.lineWidth = 1.5;
             ctx.beginPath();
@@ -1561,7 +1568,6 @@
             });
             ctx.stroke();
             
-            // Best line
             ctx.strokeStyle = '#ff00ff';
             ctx.beginPath();
             fitnessHistory.forEach((f, i) => {
@@ -1571,7 +1577,6 @@
             });
             ctx.stroke();
             
-            // Laps
             ctx.strokeStyle = '#00ff88';
             ctx.beginPath();
             fitnessHistory.forEach((f, i) => {
@@ -1589,7 +1594,6 @@
             
             const sx = w / mainCanvas.width, sy = h / mainCanvas.height;
             
-            // Mini track
             ctx.strokeStyle = '#333';
             ctx.lineWidth = 0.5;
             track.walls.forEach(wall => {
@@ -1599,7 +1603,6 @@
                 ctx.stroke();
             });
             
-            // All-time best
             if (allTimeBestPath.length > 1) {
                 ctx.strokeStyle = '#00ff88';
                 ctx.lineWidth = 1.5;
@@ -1609,7 +1612,6 @@
                 ctx.stroke();
             }
             
-            // Current best
             if (currentBestPath.length > 1) {
                 ctx.strokeStyle = '#ffff00';
                 ctx.lineWidth = 1;
@@ -1621,7 +1623,6 @@
                 ctx.setLineDash([]);
             }
             
-            // Optimal
             if (track.optimalLine.length > 1) {
                 ctx.strokeStyle = '#ff00ff';
                 ctx.lineWidth = 1;
@@ -1664,14 +1665,13 @@
 
         let displayOpts = { sensors: true, agents: true, checkpoints: true, racingLine: false };
         
-        // Evolution settings
         let useCrossover = true;
         let speedPriority = true;
 
-        // Drawing
         let drawMode = false;
         let isDrawing = false;
         let drawPath = [];
+        let wasRunningBeforeDraw = false;
 
         function clearRacingLines() {
             currentBestPath = [];
@@ -1711,7 +1711,6 @@
             document.getElementById('avgSpeed').textContent = avgSpd.toFixed(2);
             document.getElementById('footerCheckpoints').textContent = maxCp;
             
-            // Update best lap from current agents
             const agentBestLap = Math.min(...agents.filter(a => a.bestLap < Infinity).map(a => a.bestLap), Infinity);
             if (agentBestLap < bestLapTime) bestLapTime = agentBestLap;
             
@@ -1723,14 +1722,13 @@
         }
 
         function gameLoop() {
-            if (!paused) {
+            // Only run simulation if not in draw mode and track exists
+            if (!paused && !drawMode && track.walls.length > 0) {
                 for (let s = 0; s < speed; s++) {
-                    // Find current best alive agent and track its path live
                     const aliveAgents = agents.filter(a => a.alive);
                     if (aliveAgents.length > 0) {
                         const currentBest = aliveAgents.reduce((a, b) => a.fitness > b.fitness ? a : b);
                         if (currentBest && currentBest.path.length > 0) {
-                            // Update current best path to follow the live best agent
                             currentBestPath = [...currentBest.path];
                         }
                     }
@@ -1750,47 +1748,71 @@
                 }
             }
             
-            // Render main canvas
-            mainCtx.save();
+            // Render
             mainCtx.fillStyle = '#0a0a12';
             mainCtx.fillRect(0, 0, mainCanvas.width, mainCanvas.height);
             
-            drawTrack(mainCtx);
-            
-            if (displayOpts.agents) {
-                const sorted = [...agents].sort((a, b) => a.fitness - b.fitness);
-                const best = sorted[sorted.length - 1];
+            // Draw mode overlay
+            if (drawMode && track.walls.length === 0) {
+                mainCtx.fillStyle = 'rgba(0,0,0,0.5)';
+                mainCtx.fillRect(0, 0, mainCanvas.width, mainCanvas.height);
+                mainCtx.fillStyle = '#00f5ff';
+                mainCtx.font = '24px sans-serif';
+                mainCtx.textAlign = 'center';
+                mainCtx.fillText('Draw a closed track loop', mainCanvas.width/2, mainCanvas.height/2 - 20);
+                mainCtx.font = '14px sans-serif';
+                mainCtx.fillStyle = '#888';
+                mainCtx.fillText('Click and drag to draw. Connect the end to the start.', mainCanvas.width/2, mainCanvas.height/2 + 20);
+            } else {
+                drawTrack(mainCtx);
                 
-                for (const a of sorted) {
-                    if (a !== best) a.draw(mainCtx, false, false);
+                if (displayOpts.agents && track.walls.length > 0) {
+                    const sorted = [...agents].sort((a, b) => a.fitness - b.fitness);
+                    const best = sorted[sorted.length - 1];
+                    
+                    for (const a of sorted) {
+                        if (a !== best) a.draw(mainCtx, false, false);
+                    }
+                    if (best) best.draw(mainCtx, true, displayOpts.sensors);
                 }
-                if (best) best.draw(mainCtx, true, displayOpts.sensors);
             }
             
-            // Draw current drawing preview
+            // Drawing preview
             if (isDrawing && drawPath.length > 1) {
-                mainCtx.strokeStyle = '#ffff00';
-                mainCtx.lineWidth = 3;
-                mainCtx.setLineDash([5, 5]);
+                mainCtx.strokeStyle = 'rgba(0,255,255,0.3)';
+                mainCtx.lineWidth = CONFIG.TRACK_WIDTH * 2;
                 mainCtx.lineCap = 'round';
                 mainCtx.lineJoin = 'round';
                 mainCtx.beginPath();
                 mainCtx.moveTo(drawPath[0].x, drawPath[0].y);
                 drawPath.forEach(p => mainCtx.lineTo(p.x, p.y));
                 mainCtx.stroke();
-                mainCtx.setLineDash([]);
                 
-                // Preview track width
-                mainCtx.strokeStyle = 'rgba(0,255,255,0.2)';
-                mainCtx.lineWidth = CONFIG.TRACK_WIDTH * 2;
-                mainCtx.lineCap = 'round';
+                mainCtx.strokeStyle = '#ffff00';
+                mainCtx.lineWidth = 3;
+                mainCtx.setLineDash([5, 5]);
                 mainCtx.beginPath();
                 mainCtx.moveTo(drawPath[0].x, drawPath[0].y);
                 drawPath.forEach(p => mainCtx.lineTo(p.x, p.y));
                 mainCtx.stroke();
+                mainCtx.setLineDash([]);
+                
+                // Show connection hint
+                const first = drawPath[0];
+                const last = drawPath[drawPath.length - 1];
+                const dist = Math.sqrt((first.x - last.x)**2 + (first.y - last.y)**2);
+                
+                if (dist < 80) {
+                    mainCtx.fillStyle = 'rgba(0,255,136,0.5)';
+                    mainCtx.beginPath();
+                    mainCtx.arc(first.x, first.y, 30, 0, Math.PI * 2);
+                    mainCtx.fill();
+                    mainCtx.fillStyle = '#00ff88';
+                    mainCtx.font = '12px sans-serif';
+                    mainCtx.textAlign = 'center';
+                    mainCtx.fillText('Release to close', first.x, first.y - 40);
+                }
             }
-            
-            mainCtx.restore();
             
             // Side panels
             const best = agents.reduce((a, b) => (a?.fitness || 0) > (b?.fitness || 0) ? a : b, null);
@@ -1804,7 +1826,7 @@
             drawFitnessChart(chartCtx);
             drawRacingLinePreview(racingLineCtx);
             
-            updateStats();
+            if (!drawMode) updateStats();
             requestAnimationFrame(gameLoop);
         }
 
@@ -1855,21 +1877,29 @@
             e.preventDefault();
             e.stopPropagation();
             
-            if (drawPath.length > 5) {
-                // Close the path if endpoints are close
+            if (drawPath.length > 10) {
+                // Check if close enough to start
                 const first = drawPath[0];
                 const last = drawPath[drawPath.length - 1];
                 const dist = Math.sqrt((first.x - last.x)**2 + (first.y - last.y)**2);
                 
-                if (dist < 50) {
-                    // Close the loop
-                    drawPath.push({ x: first.x, y: first.y });
+                if (dist < 100) {
+                    // Close and create track
+                    track.clear();
+                    clearRacingLines();
+                    track.addPath(drawPath, 0);
+                    
+                    // Exit draw mode and start
+                    toggleDrawMode();
+                    generation = 1;
+                    frameCount = 0;
+                    fitnessHistory = [];
+                    totalLaps = 0;
+                    spawnAgents();
+                    showToast('🏁 Custom track created!', 'success');
+                } else {
+                    showToast('⚠️ Connect the end to the start!', 'warning');
                 }
-                
-                const level = track.paths.length;
-                track.addPath(drawPath, level);
-                clearRacingLines();
-                resetAgentsOnly();
             }
             
             isDrawing = false;
@@ -1885,11 +1915,10 @@
         mainCanvas.addEventListener('touchmove', moveDraw, { passive: false });
         mainCanvas.addEventListener('touchend', endDraw, { passive: false });
 
-        // Zoom with scroll/pinch
         let lastTouchDist = 0;
 
         canvasWrapper.addEventListener('wheel', (e) => {
-            if (drawMode) return; // Don't zoom while drawing
+            if (drawMode) return;
             e.preventDefault();
             const delta = e.deltaY > 0 ? -0.1 : 0.1;
             setZoom(zoom + delta);
@@ -1948,6 +1977,7 @@
             document.getElementById('avgSpeed').textContent = '0';
             document.getElementById('statBestLap').textContent = '--';
             document.getElementById('footerBestLap').textContent = '--';
+            if (drawMode) toggleDrawMode();
             generateRandomTrack();
         }
 
@@ -1964,16 +1994,27 @@
             document.getElementById('drawModeStatus').textContent = drawMode ? '✏️ Drawing Mode' : '';
             
             if (drawMode) {
+                wasRunningBeforeDraw = !paused;
+                paused = true;
+                track.clear();
+                clearRacingLines();
+                agents = [];
                 mainCanvas.style.cursor = 'crosshair';
+                showToast('✏️ Draw a closed loop track', 'info');
             } else {
                 mainCanvas.style.cursor = 'default';
+                if (wasRunningBeforeDraw) {
+                    paused = false;
+                }
             }
+            document.getElementById('pauseBtn').textContent = paused ? '▶ Play' : '⏸ Pause';
         }
 
         function clearTrack() {
             track.clear();
             clearRacingLines();
             totalLaps = 0;
+            agents = [];
         }
 
         function toggleOption(opt) {
@@ -2002,7 +2043,6 @@
             document.getElementById('canvasWidth').value = w;
             document.getElementById('canvasHeight').value = h;
             
-            // Regenerate track and reset
             clearRacingLines();
             if (track.paths.length > 0) {
                 generateRandomTrack();
@@ -2035,7 +2075,6 @@
         }
 
         // ============== INIT ==============
-        // Set initial container size
         canvasContainer.style.width = mainCanvas.width + 'px';
         canvasContainer.style.height = mainCanvas.height + 'px';
         
@@ -2043,4 +2082,4 @@
         gameLoop();
     </script>
 </body>
-</html>
+    </html> 
