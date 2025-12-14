@@ -1,0 +1,2046 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>TinyML Racing Lab: Neuro-Evolutionary Circuit Mastery</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: #0a0a12;
+            color: #e0e0e0;
+            overflow: hidden;
+            height: 100%;
+            touch-action: none;
+        }
+        .app-container {
+            display: flex;
+            height: 100%;
+        }
+        .left-panel {
+            width: 260px;
+            background: rgba(15, 15, 30, 0.98);
+            border-right: 1px solid #2a2a4a;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            flex-shrink: 0;
+            z-index: 100;
+        }
+        .right-panel {
+            width: 300px;
+            background: rgba(15, 15, 30, 0.98);
+            border-left: 1px solid #2a2a4a;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            flex-shrink: 0;
+            z-index: 100;
+        }
+        .main-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            min-width: 0;
+        }
+        .header {
+            background: linear-gradient(90deg, rgba(0,245,255,0.1), rgba(255,0,255,0.1));
+            padding: 6px 12px;
+            border-bottom: 1px solid #2a2a4a;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-shrink: 0;
+        }
+        .header h1 {
+            font-size: 1em;
+            background: linear-gradient(90deg, #00f5ff, #ff00ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .canvas-wrapper {
+            flex: 1;
+            overflow: auto;
+            background: #050508;
+            position: relative;
+        }
+        .canvas-container {
+            position: relative;
+            transform-origin: 0 0;
+            width: 1400px;
+            height: 800px;
+        }
+        #mainCanvas {
+            display: block;
+            background: #0a0a12;
+        }
+        .panel {
+            padding: 8px;
+            border-bottom: 1px solid #1a1a3a;
+        }
+        .panel-title {
+            font-size: 0.7em;
+            color: #00f5ff;
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .panel-title::before {
+            content: '';
+            width: 5px;
+            height: 5px;
+            background: #00f5ff;
+            border-radius: 50%;
+        }
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 3px 0;
+            font-size: 0.65em;
+        }
+        .stat-value {
+            color: #ff00ff;
+            font-weight: bold;
+        }
+        .stat-value.good { color: #00ff88; }
+        .stat-value.warning { color: #ffaa00; }
+        .btn-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4px;
+            margin: 4px 0;
+        }
+        .btn {
+            padding: 6px 8px;
+            border: 1px solid #3a3a6a;
+            background: rgba(0,0,0,0.3);
+            color: #aaa;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.6em;
+            transition: all 0.2s;
+            text-align: center;
+        }
+        .btn:hover { border-color: #00f5ff; color: #00f5ff; }
+        .btn.active { background: rgba(0,245,255,0.15); border-color: #00f5ff; color: #00f5ff; }
+        .btn.primary { background: linear-gradient(135deg, #00f5ff, #0088ff); color: #000; border: none; font-weight: bold; }
+        .btn.danger { background: linear-gradient(135deg, #ff0066, #ff00ff); color: #fff; border: none; }
+        .btn.success { background: linear-gradient(135deg, #00ff88, #00aa55); color: #000; border: none; }
+        .btn.full { grid-column: 1 / -1; }
+        .toggle-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin: 4px 0;
+            font-size: 0.65em;
+        }
+        .toggle {
+            width: 36px;
+            height: 18px;
+            background: #1a1a3a;
+            border-radius: 9px;
+            position: relative;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .toggle.active { background: #00f5ff; }
+        .toggle::after {
+            content: '';
+            position: absolute;
+            width: 14px;
+            height: 14px;
+            background: #fff;
+            border-radius: 50%;
+            top: 2px;
+            left: 2px;
+            transition: all 0.3s;
+        }
+        .toggle.active::after { left: 20px; }
+        .memory-gauge {
+            height: 18px;
+            background: #1a1a3a;
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 5px 0;
+            position: relative;
+        }
+        .memory-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #00f5ff, #ff00ff);
+            transition: width 0.5s;
+        }
+        .memory-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 0.55em;
+            font-weight: bold;
+        }
+        .mini-canvas-container {
+            background: #0a0a15;
+            border-radius: 5px;
+            padding: 4px;
+            margin: 4px 0;
+        }
+        .mini-canvas-container canvas {
+            display: block;
+            width: 100%;
+            border-radius: 3px;
+        }
+        .export-area textarea {
+            width: 100%;
+            height: 50px;
+            background: #050508;
+            border: 1px solid #2a2a4a;
+            color: #00f5ff;
+            font-size: 0.5em;
+            font-family: monospace;
+            resize: none;
+            border-radius: 3px;
+            padding: 4px;
+        }
+        .track-size-control {
+            display: flex;
+            gap: 4px;
+            align-items: center;
+            margin: 4px 0;
+            flex-wrap: wrap;
+        }
+        .track-size-control input {
+            width: 55px;
+            background: #1a1a3a;
+            border: 1px solid #3a3a6a;
+            color: #fff;
+            padding: 3px;
+            border-radius: 3px;
+            font-size: 0.65em;
+            text-align: center;
+        }
+        .track-size-control span { font-size: 0.6em; color: #888; }
+        .drawing-info {
+            background: rgba(255,0,102,0.1);
+            border: 1px solid #ff0066;
+            border-radius: 4px;
+            padding: 6px;
+            font-size: 0.6em;
+            color: #ff9999;
+            margin: 4px 0;
+            display: none;
+        }
+        .drawing-info.active { display: block; }
+        .status-bar {
+            background: #0a0a15;
+            padding: 4px 12px;
+            border-top: 1px solid #2a2a4a;
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.6em;
+            color: #666;
+            flex-shrink: 0;
+        }
+        .zoom-controls {
+            display: flex;
+            gap: 4px;
+            align-items: center;
+        }
+        .zoom-controls button {
+            width: 22px;
+            height: 22px;
+            border: 1px solid #3a3a6a;
+            background: #1a1a3a;
+            color: #888;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .zoom-controls button:hover { border-color: #00f5ff; color: #00f5ff; }
+        .legend {
+            display: flex;
+            gap: 6px;
+            font-size: 0.5em;
+            color: #888;
+            margin-top: 4px;
+            flex-wrap: wrap;
+        }
+        .legend-item { display: flex; align-items: center; gap: 2px; }
+        .legend-dot { width: 8px; height: 8px; border-radius: 50%; }
+        .network-info {
+            font-size: 0.55em;
+            color: #888;
+            margin-top: 4px;
+        }
+        .network-info code {
+            background: #1a1a3a;
+            padding: 1px 3px;
+            border-radius: 2px;
+            color: #00f5ff;
+        }
+        .mode-indicator {
+            font-size: 0.55em;
+            padding: 2px 6px;
+            border-radius: 3px;
+            margin-top: 4px;
+            text-align: center;
+        }
+        .mode-indicator.pooled {
+            background: rgba(0, 245, 255, 0.2);
+            color: #00f5ff;
+            border: 1px solid #00f5ff;
+        }
+        .mode-indicator.individual {
+            background: rgba(255, 136, 0, 0.2);
+            color: #ff8800;
+            border: 1px solid #ff8800;
+        }
+        .toggle.orange { background: #ff8800; }
+        /* Toast notifications */
+        .toast {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: linear-gradient(135deg, #00ff88, #00aa55);
+            color: #000;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 14px;
+            z-index: 10000;
+            animation: toastIn 0.3s ease, toastOut 0.3s ease 2.7s forwards;
+            box-shadow: 0 4px 20px rgba(0,255,136,0.4);
+        }
+        @keyframes toastIn {
+            from { opacity: 0; transform: translateX(-50%) translateY(-20px); }
+            to { opacity: 1; transform: translateX(-50%) translateY(0); }
+        }
+        @keyframes toastOut {
+            from { opacity: 1; transform: translateX(-50%) translateY(0); }
+            to { opacity: 0; transform: translateX(-50%) translateY(-20px); }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <div class="left-panel">
+            <div class="panel">
+                <div class="panel-title">Simulation</div>
+                <div class="btn-group">
+                    <button class="btn primary" id="pauseBtn" onclick="togglePause()">⏸ Pause</button>
+                    <button class="btn primary" id="speedBtn" onclick="cycleSpeed()">⚡ 1x</button>
+                </div>
+                <div class="btn-group">
+                    <button class="btn danger" onclick="resetSimulation()">🔄 Reset All</button>
+                    <button class="btn" onclick="resetAgentsOnly()">🚗 Reset Cars</button>
+                </div>
+            </div>
+            
+            <div class="panel">
+                <div class="panel-title">Track Editor</div>
+                <div class="btn-group">
+                    <button class="btn full" id="drawBtn" onclick="toggleDrawMode()">✏️ Draw Track (Auto Walls)</button>
+                </div>
+                <div class="drawing-info" id="drawingInfo">
+                    <strong>Drawing Mode!</strong> Click & drag centerline.<br>
+                    Release to create track segment.
+                </div>
+                <div class="btn-group">
+                    <button class="btn" onclick="generateRandomTrack()">🎲 Random</button>
+                    <button class="btn" onclick="clearTrack()">🗑️ Clear</button>
+                </div>
+                <div class="btn-group">
+                    <button class="btn" onclick="generateFigure8()">∞ Figure-8</button>
+                    <button class="btn" onclick="generateOval()">⭕ Oval</button>
+                </div>
+                <div class="track-size-control">
+                    <span>Size:</span>
+                    <input type="number" id="canvasWidth" value="1400" min="600" max="4000" step="100">
+                    <span>×</span>
+                    <input type="number" id="canvasHeight" value="800" min="400" max="3000" step="100">
+                    <button class="btn" onclick="resizeCanvas()">Set</button>
+                </div>
+            </div>
+            
+            <div class="panel">
+                <div class="panel-title">Display</div>
+                <div class="toggle-row">
+                    <span>Show Sensors</span>
+                    <div class="toggle active" id="toggleSensors" onclick="toggleOption('sensors')"></div>
+                </div>
+                <div class="toggle-row">
+                    <span>Show All Agents</span>
+                    <div class="toggle active" id="toggleAgents" onclick="toggleOption('agents')"></div>
+                </div>
+                <div class="toggle-row">
+                    <span>Show Checkpoints</span>
+                    <div class="toggle active" id="toggleCheckpoints" onclick="toggleOption('checkpoints')"></div>
+                </div>
+                <div class="toggle-row">
+                    <span>Show Racing Lines</span>
+                    <div class="toggle" id="toggleRacingLine" onclick="toggleOption('racingLine')"></div>
+                </div>
+            </div>
+            
+            <div class="panel">
+                <div class="panel-title">Quantization (TinyML)</div>
+                <div class="btn-group">
+                    <button class="btn active" id="btnFloat32" onclick="setPrecision('float32')">Float32</button>
+                    <button class="btn" id="btnInt8" onclick="setPrecision('int8')">Int8</button>
+                </div>
+                <div class="memory-gauge">
+                    <div class="memory-fill" id="memoryFill" style="width: 100%"></div>
+                    <span class="memory-text" id="memoryText">128 KB</span>
+                </div>
+                <div class="stat-row">
+                    <span>Inference Quality:</span>
+                    <span class="stat-value good" id="inferenceQuality">100%</span>
+                </div>
+            </div>
+            
+            <div class="panel">
+                <div class="panel-title">Evolution</div>
+                <div class="stat-row"><span>Population:</span><span class="stat-value">50</span></div>
+                <div class="stat-row"><span>Mutation Rate:</span><span class="stat-value" id="mutRate">15%</span></div>
+                <div class="stat-row"><span>Elite Count:</span><span class="stat-value">5</span></div>
+                <div class="toggle-row">
+                    <span>Crossover (Pooled)</span>
+                    <div class="toggle active" id="toggleCrossover" onclick="toggleCrossover()"></div>
+                </div>
+                <div class="toggle-row">
+                    <span>Speed Priority</span>
+                    <div class="toggle active" id="toggleSpeedPriority" onclick="toggleSpeedPriority()"></div>
+                </div>
+                <div class="stat-row"><span>Learning Mode:</span><span class="stat-value" id="learningMode">Pooled</span></div>
+                <div class="stat-row"><span>Avg Speed:</span><span class="stat-value" id="avgSpeed">0</span></div>
+            </div>
+        </div>
+        
+        <div class="main-area">
+            <div class="header">
+                <h1>🏎️ TinyML Racing Lab</h1>
+                <div class="zoom-controls">
+                    <button onclick="zoomOut()">−</button>
+                    <span id="zoomLevel">100%</span>
+                    <button onclick="zoomIn()">+</button>
+                    <button onclick="resetZoom()">⟲</button>
+                </div>
+            </div>
+            <div class="canvas-wrapper" id="canvasWrapper">
+                <div class="canvas-container" id="canvasContainer">
+                    <canvas id="mainCanvas" width="1400" height="800"></canvas>
+                </div>
+            </div>
+            <div class="status-bar">
+                <span>Gen <span id="footerGen">1</span> | Frame <span id="footerFrame">0</span>/600 | Alive: <span id="footerAlive">50</span></span>
+                <span>Best Lap: <span id="footerBestLap">--</span> | Checkpoints: <span id="footerCheckpoints">0</span></span>
+                <span id="drawModeStatus"></span>
+            </div>
+        </div>
+        
+        <div class="right-panel">
+            <div class="panel">
+                <div class="panel-title">Statistics</div>
+                <div class="stat-row"><span>Generation:</span><span class="stat-value" id="statGen">1</span></div>
+                <div class="stat-row"><span>Best Fitness:</span><span class="stat-value good" id="statBest">0</span></div>
+                <div class="stat-row"><span>Avg Fitness:</span><span class="stat-value" id="statAvg">0</span></div>
+                <div class="stat-row"><span>Total Laps:</span><span class="stat-value good" id="statLaps">0</span></div>
+                <div class="stat-row"><span>Best Lap Time:</span><span class="stat-value warning" id="statBestLap">--</span></div>
+                <div class="stat-row"><span>Top Speed:</span><span class="stat-value" id="statSpeed">0</span></div>
+            </div>
+            
+            <div class="panel">
+                <div class="panel-title">Best Brain</div>
+                <div class="mini-canvas-container">
+                    <canvas id="brainCanvas" width="280" height="140"></canvas>
+                </div>
+                <div class="network-info">
+                    Arch: <code>5→8→2</code> | Weights: <code id="weightCount">58</code>
+                </div>
+            </div>
+            
+            <div class="panel">
+                <div class="panel-title">Fitness History</div>
+                <div class="mini-canvas-container">
+                    <canvas id="fitnessChart" width="280" height="70"></canvas>
+                </div>
+                <div class="legend">
+                    <div class="legend-item"><div class="legend-dot" style="background:#00f5ff"></div>Avg</div>
+                    <div class="legend-item"><div class="legend-dot" style="background:#ff00ff"></div>Best</div>
+                    <div class="legend-item"><div class="legend-dot" style="background:#00ff88"></div>Laps</div>
+                </div>
+            </div>
+            
+            <div class="panel">
+                <div class="panel-title">Racing Lines</div>
+                <div class="mini-canvas-container">
+                    <canvas id="racingLineCanvas" width="280" height="100"></canvas>
+                </div>
+                <div class="legend">
+                    <div class="legend-item"><div class="legend-dot" style="background:#00ff88"></div>Best Ever</div>
+                    <div class="legend-item"><div class="legend-dot" style="background:#ffff00"></div>Current Best</div>
+                    <div class="legend-item"><div class="legend-dot" style="background:#ff00ff"></div>Optimal</div>
+                </div>
+            </div>
+            
+            <div class="panel">
+                <div class="panel-title">Heatmap</div>
+                <div class="mini-canvas-container">
+                    <canvas id="heatmapCanvas" width="280" height="100"></canvas>
+                </div>
+            </div>
+            
+            <div class="panel">
+                <div class="panel-title">Export Network</div>
+                <div class="btn-group">
+                    <button class="btn success full" onclick="exportWeights()">📥 Export JSON</button>
+                </div>
+                <div class="export-area">
+                    <textarea id="exportData" readonly placeholder="Click export..."></textarea>
+                </div>
+                <div class="btn-group">
+                    <button class="btn full" onclick="downloadWeights()">💾 Download</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ============== CONFIG ==============
+        const CONFIG = {
+            AGENT_COUNT: 50,
+            GEN_FRAMES: 600,
+            SENSOR_COUNT: 5,
+            SENSOR_RANGE: 120,
+            SENSOR_SPREAD: Math.PI * 0.8,
+            MUTATION_RATE: 0.15,
+            MUTATION_AMT: 0.4,
+            FRICTION: 0.96,
+            MAX_SPEED: 5,
+            ACCEL: 0.25,
+            TURN_SPEED: 0.06,
+            ELITE_COUNT: 5,
+            TRACK_WIDTH: 45
+        };
+
+        // ============== NEURAL NETWORK (Simpler: 5→8→2) ==============
+        class Brain {
+            constructor() {
+                this.w1 = this.randMatrix(8, 5);
+                this.b1 = this.randArray(8);
+                this.w2 = this.randMatrix(2, 8);
+                this.b2 = this.randArray(2);
+                this.activations = { input: [], hidden: [], output: [] };
+            }
+            
+            randMatrix(r, c) {
+                return Array.from({length: r}, () => 
+                    Array.from({length: c}, () => (Math.random() - 0.5) * 2)
+                );
+            }
+            
+            randArray(n) {
+                return Array.from({length: n}, () => (Math.random() - 0.5) * 0.5);
+            }
+            
+            relu(x) { return Math.max(0, x); }
+            tanh(x) { return Math.tanh(x); }
+            
+            quantize(v) {
+                return Math.round(Math.max(-127, Math.min(127, v * 127))) / 127;
+            }
+            
+            forward(inputs, int8 = false) {
+                this.activations.input = [...inputs];
+                
+                // Hidden layer
+                const hidden = [];
+                for (let j = 0; j < 8; j++) {
+                    let sum = int8 ? this.quantize(this.b1[j]) : this.b1[j];
+                    for (let i = 0; i < 5; i++) {
+                        const w = int8 ? this.quantize(this.w1[j][i]) : this.w1[j][i];
+                        const a = int8 ? this.quantize(inputs[i]) : inputs[i];
+                        sum += w * a;
+                    }
+                    hidden[j] = this.relu(sum);
+                    if (int8) hidden[j] = this.quantize(hidden[j]);
+                }
+                this.activations.hidden = hidden;
+                
+                // Output layer
+                const output = [];
+                for (let j = 0; j < 2; j++) {
+                    let sum = int8 ? this.quantize(this.b2[j]) : this.b2[j];
+                    for (let i = 0; i < 8; i++) {
+                        const w = int8 ? this.quantize(this.w2[j][i]) : this.w2[j][i];
+                        sum += w * hidden[i];
+                    }
+                    output[j] = this.tanh(sum);
+                    if (int8) output[j] = this.quantize(output[j]);
+                }
+                this.activations.output = output;
+                
+                return output;
+            }
+            
+            clone() {
+                const b = new Brain();
+                b.w1 = this.w1.map(r => [...r]);
+                b.b1 = [...this.b1];
+                b.w2 = this.w2.map(r => [...r]);
+                b.b2 = [...this.b2];
+                return b;
+            }
+            
+            mutate(rate, amt) {
+                const mut = v => Math.random() < rate ? v + (Math.random() - 0.5) * 2 * amt : v;
+                this.w1 = this.w1.map(r => r.map(mut));
+                this.b1 = this.b1.map(mut);
+                this.w2 = this.w2.map(r => r.map(mut));
+                this.b2 = this.b2.map(mut);
+            }
+            
+            static crossover(a, b) {
+                const c = new Brain();
+                for (let j = 0; j < 8; j++) {
+                    for (let i = 0; i < 5; i++) {
+                        c.w1[j][i] = Math.random() < 0.5 ? a.w1[j][i] : b.w1[j][i];
+                    }
+                    c.b1[j] = Math.random() < 0.5 ? a.b1[j] : b.b1[j];
+                }
+                for (let j = 0; j < 2; j++) {
+                    for (let i = 0; i < 8; i++) {
+                        c.w2[j][i] = Math.random() < 0.5 ? a.w2[j][i] : b.w2[j][i];
+                    }
+                    c.b2[j] = Math.random() < 0.5 ? a.b2[j] : b.b2[j];
+                }
+                return c;
+            }
+            
+            toJSON() {
+                return JSON.stringify({ w1: this.w1, b1: this.b1, w2: this.w2, b2: this.b2 });
+            }
+            
+            getWeightCount() {
+                return 8 * 5 + 8 + 2 * 8 + 2; // 58 params
+            }
+        }
+
+        // ============== RAY-LINE INTERSECTION ==============
+        function raySegmentIntersect(ox, oy, dx, dy, x1, y1, x2, y2) {
+            const sx = x2 - x1, sy = y2 - y1;
+            const denom = dx * sy - dy * sx;
+            if (Math.abs(denom) < 1e-10) return null;
+            
+            const t = ((x1 - ox) * sy - (y1 - oy) * sx) / denom;
+            const u = ((x1 - ox) * dy - (y1 - oy) * dx) / denom;
+            
+            if (t > 0 && u >= 0 && u <= 1) {
+                return { x: ox + dx * t, y: oy + dy * t, dist: t };
+            }
+            return null;
+        }
+
+        // ============== TRACK ==============
+        class Track {
+            constructor() {
+                this.paths = [];
+                this.walls = [];
+                this.checkpoints = [];
+                this.startX = 300;
+                this.startY = 400;
+                this.startAngle = 0;
+                this.centerline = [];
+                this.optimalLine = [];
+            }
+            
+            addPath(points, level = 0) {
+                if (points.length < 3) return;
+                
+                const smoothed = this.smoothPoints(points);
+                this.paths.push({ points: smoothed, level });
+                this.rebuildWalls();
+                
+                if (this.paths.length === 1) {
+                    this.startX = smoothed[0].x;
+                    this.startY = smoothed[0].y;
+                    const dx = smoothed[1].x - smoothed[0].x;
+                    const dy = smoothed[1].y - smoothed[0].y;
+                    this.startAngle = Math.atan2(dy, dx);
+                    this.centerline = smoothed;
+                    this.calculateOptimalLine();
+                }
+            }
+            
+            smoothPoints(pts) {
+                if (pts.length < 3) return pts;
+                const result = [];
+                for (let i = 0; i < pts.length; i++) {
+                    const p = pts[Math.max(0, i-1)];
+                    const c = pts[i];
+                    const n = pts[Math.min(pts.length-1, i+1)];
+                    result.push({
+                        x: (p.x + c.x * 2 + n.x) / 4,
+                        y: (p.y + c.y * 2 + n.y) / 4
+                    });
+                }
+                return result;
+            }
+            
+            rebuildWalls() {
+                this.walls = [];
+                this.checkpoints = [];
+                
+                this.paths.forEach((path, pi) => {
+                    const pts = path.points;
+                    const w = CONFIG.TRACK_WIDTH;
+                    
+                    if (pts.length < 2) return;
+                    
+                    // Build continuous wall points to avoid gaps
+                    const leftWall = [];
+                    const rightWall = [];
+                    
+                    for (let i = 0; i < pts.length; i++) {
+                        const prev = pts[(i - 1 + pts.length) % pts.length];
+                        const curr = pts[i];
+                        const next = pts[(i + 1) % pts.length];
+                        
+                        // Calculate averaged normal at this point for smooth corners
+                        const dx1 = curr.x - prev.x;
+                        const dy1 = curr.y - prev.y;
+                        const dx2 = next.x - curr.x;
+                        const dy2 = next.y - curr.y;
+                        
+                        const len1 = Math.sqrt(dx1*dx1 + dy1*dy1) || 1;
+                        const len2 = Math.sqrt(dx2*dx2 + dy2*dy2) || 1;
+                        
+                        // Average the normals
+                        const nx1 = -dy1 / len1;
+                        const ny1 = dx1 / len1;
+                        const nx2 = -dy2 / len2;
+                        const ny2 = dx2 / len2;
+                        
+                        let nx = (nx1 + nx2) / 2;
+                        let ny = (ny1 + ny2) / 2;
+                        const nlen = Math.sqrt(nx*nx + ny*ny) || 1;
+                        nx /= nlen;
+                        ny /= nlen;
+                        
+                        leftWall.push({ x: curr.x + nx * w, y: curr.y + ny * w });
+                        rightWall.push({ x: curr.x - nx * w, y: curr.y - ny * w });
+                    }
+                    
+                    // Create wall segments from the computed points (closed loop)
+                    for (let i = 0; i < leftWall.length; i++) {
+                        const next = (i + 1) % leftWall.length;
+                        
+                        this.walls.push({
+                            x1: leftWall[i].x, y1: leftWall[i].y,
+                            x2: leftWall[next].x, y2: leftWall[next].y,
+                            level: path.level
+                        });
+                        this.walls.push({
+                            x1: rightWall[i].x, y1: rightWall[i].y,
+                            x2: rightWall[next].x, y2: rightWall[next].y,
+                            level: path.level
+                        });
+                    }
+                    
+                    // Checkpoints along the path
+                    const cpInterval = Math.max(1, Math.floor(pts.length / 12));
+                    for (let i = 0; i < pts.length; i += cpInterval) {
+                        this.checkpoints.push({
+                            x: pts[i].x, y: pts[i].y,
+                            radius: w * 1.2,
+                            index: this.checkpoints.length,
+                            level: path.level
+                        });
+                    }
+                });
+            }
+            
+            calculateOptimalLine() {
+                // Calculate racing line (apexes)
+                this.optimalLine = [];
+                const pts = this.centerline;
+                if (pts.length < 5) return;
+                
+                for (let i = 0; i < pts.length; i++) {
+                    const prev = pts[(i - 2 + pts.length) % pts.length];
+                    const curr = pts[i];
+                    const next = pts[(i + 2) % pts.length];
+                    
+                    // Calculate curvature direction
+                    const dx1 = curr.x - prev.x, dy1 = curr.y - prev.y;
+                    const dx2 = next.x - curr.x, dy2 = next.y - curr.y;
+                    const cross = dx1 * dy2 - dy1 * dx2;
+                    
+                    // Offset toward inside of curve
+                    const len = Math.sqrt(dx2*dx2 + dy2*dy2) || 1;
+                    const nx = -dy2 / len, ny = dx2 / len;
+                    const offset = Math.sign(cross) * CONFIG.TRACK_WIDTH * 0.3;
+                    
+                    this.optimalLine.push({
+                        x: curr.x + nx * offset,
+                        y: curr.y + ny * offset
+                    });
+                }
+            }
+            
+            clear() {
+                this.paths = [];
+                this.walls = [];
+                this.checkpoints = [];
+                this.centerline = [];
+                this.optimalLine = [];
+            }
+        }
+
+        // ============== AGENT ==============
+        class Agent {
+            constructor(x, y, angle, brain = null) {
+                this.startX = x;
+                this.startY = y;
+                this.startAngle = angle;
+                this.brain = brain || new Brain();
+                this.reset();
+            }
+            
+            reset() {
+                this.x = this.startX;
+                this.y = this.startY;
+                this.angle = this.startAngle;
+                this.vx = 0;
+                this.vy = 0;
+                this.speed = 0;
+                this.alive = true;
+                this.fitness = 0;
+                this.cpIndex = 0;
+                this.laps = 0;
+                this.lapTime = 0;
+                this.bestLap = Infinity;
+                this.distance = 0;
+                this.stuckTimer = 0;
+                this.maxSpeed = 0;
+                this.avgSpeed = 0;
+                this.sensors = new Array(CONFIG.SENSOR_COUNT).fill(1);
+                this.sensorHits = [];
+                this.path = [];
+                this.currentLevel = 0;
+            }
+            
+            updateSensors(walls) {
+                const halfSpread = CONFIG.SENSOR_SPREAD / 2;
+                const step = CONFIG.SENSOR_SPREAD / (CONFIG.SENSOR_COUNT - 1);
+                this.sensorHits = [];
+                
+                for (let i = 0; i < CONFIG.SENSOR_COUNT; i++) {
+                    const ang = this.angle - halfSpread + step * i;
+                    const dx = Math.cos(ang), dy = Math.sin(ang);
+                    
+                    let minDist = CONFIG.SENSOR_RANGE;
+                    let hit = null;
+                    
+                    for (const wall of walls) {
+                        const result = raySegmentIntersect(
+                            this.x, this.y, dx, dy,
+                            wall.x1, wall.y1, wall.x2, wall.y2
+                        );
+                        if (result && result.dist < minDist) {
+                            minDist = result.dist;
+                            hit = { x: result.x, y: result.y };
+                        }
+                    }
+                    
+                    this.sensors[i] = minDist / CONFIG.SENSOR_RANGE;
+                    this.sensorHits[i] = hit;
+                }
+            }
+            
+            update(int8, checkpoints) {
+                if (!this.alive) return;
+                
+                const out = this.brain.forward(this.sensors, int8);
+                const steer = out[0];
+                const gas = (out[1] + 1) / 2;
+                
+                this.angle += steer * CONFIG.TURN_SPEED * (1 + this.speed * 0.15);
+                
+                this.vx += Math.cos(this.angle) * gas * CONFIG.ACCEL;
+                this.vy += Math.sin(this.angle) * gas * CONFIG.ACCEL;
+                
+                this.vx *= CONFIG.FRICTION;
+                this.vy *= CONFIG.FRICTION;
+                
+                this.speed = Math.sqrt(this.vx*this.vx + this.vy*this.vy);
+                if (this.speed > CONFIG.MAX_SPEED) {
+                    const r = CONFIG.MAX_SPEED / this.speed;
+                    this.vx *= r;
+                    this.vy *= r;
+                    this.speed = CONFIG.MAX_SPEED;
+                }
+                
+                this.maxSpeed = Math.max(this.maxSpeed, this.speed);
+                
+                const prevX = this.x, prevY = this.y;
+                this.x += this.vx;
+                this.y += this.vy;
+                
+                // Boundary check - kill if outside canvas
+                if (this.x < 0 || this.x > mainCanvas.width || this.y < 0 || this.y > mainCanvas.height) {
+                    this.alive = false;
+                    return;
+                }
+                
+                // Track path for visualization
+                if (frameCount % 3 === 0) {
+                    this.path.push({ x: this.x, y: this.y });
+                    if (this.path.length > 300) this.path.shift();
+                }
+                
+                // Stuck detection
+                const moved = Math.sqrt((this.x - prevX)**2 + (this.y - prevY)**2);
+                if (moved < 0.2) {
+                    this.stuckTimer++;
+                    if (this.stuckTimer > 60) this.alive = false;
+                } else {
+                    this.stuckTimer = 0;
+                }
+                
+                this.distance += this.speed;
+                this.lapTime++;
+                
+                this.checkCheckpoints(checkpoints);
+            }
+            
+            checkCheckpoints(cps) {
+                if (cps.length === 0) return;
+                
+                const next = cps[this.cpIndex % cps.length];
+                const d = Math.sqrt((this.x - next.x)**2 + (this.y - next.y)**2);
+                
+                if (d < next.radius) {
+                    this.cpIndex++;
+                    
+                    if (this.cpIndex >= cps.length) {
+                        this.cpIndex = 0;
+                        this.laps++;
+                        if (this.lapTime < this.bestLap) this.bestLap = this.lapTime;
+                        this.lapTime = 0;
+                    }
+                }
+                
+                // Calculate average speed (distance / time)
+                this.avgSpeed = this.lapTime > 0 ? this.distance / this.lapTime : 0;
+                
+                // Fitness calculation with speed priority option
+                const checkpointScore = (this.laps * cps.length + this.cpIndex) * 500;
+                const distanceScore = this.distance * 0.1;
+                
+                // Speed bonuses - heavily reward faster agents when speedPriority is on
+                let speedScore = 0;
+                if (speedPriority) {
+                    // Reward average speed significantly
+                    speedScore = this.avgSpeed * 200;
+                    // Bonus for maintaining high speed
+                    speedScore += this.maxSpeed * 100;
+                    // Penalty for being too slow (below 40% max speed average)
+                    if (this.avgSpeed < CONFIG.MAX_SPEED * 0.4 && this.lapTime > 100) {
+                        speedScore -= (CONFIG.MAX_SPEED * 0.4 - this.avgSpeed) * 150;
+                    }
+                } else {
+                    speedScore = this.maxSpeed * 30;
+                }
+                
+                this.fitness = checkpointScore + distanceScore + speedScore;
+                
+                // Lap completion bonus - faster laps get much higher scores
+                if (this.laps > 0 && this.bestLap < Infinity) {
+                    // Invert lap time so faster = higher score
+                    const lapBonus = 15000 / this.bestLap * this.laps;
+                    this.fitness += lapBonus;
+                }
+            }
+            
+            checkCollision(walls) {
+                for (const wall of walls) {
+                    const d = this.pointToSeg(this.x, this.y, wall.x1, wall.y1, wall.x2, wall.y2);
+                    if (d < 7) {
+                        this.alive = false;
+                        return;
+                    }
+                }
+            }
+            
+            pointToSeg(px, py, x1, y1, x2, y2) {
+                const dx = x2 - x1, dy = y2 - y1;
+                const len2 = dx*dx + dy*dy;
+                if (len2 < 1e-10) return Math.sqrt((px-x1)**2 + (py-y1)**2);
+                const t = Math.max(0, Math.min(1, ((px-x1)*dx + (py-y1)*dy) / len2));
+                const nx = x1 + t * dx, ny = y1 + t * dy;
+                return Math.sqrt((px-nx)**2 + (py-ny)**2);
+            }
+            
+            draw(ctx, isBest, showSensors) {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.angle);
+                
+                if (!this.alive) ctx.globalAlpha = 0.2;
+                
+                const color = isBest ? '#00ff88' : (this.alive ? `hsl(${180 + this.cpIndex * 10}, 100%, 55%)` : '#ff3366');
+                
+                ctx.fillStyle = color;
+                ctx.beginPath();
+                ctx.moveTo(10, 0);
+                ctx.lineTo(-6, -4);
+                ctx.lineTo(-3, 0);
+                ctx.lineTo(-6, 4);
+                ctx.closePath();
+                ctx.fill();
+                
+                if (isBest && this.alive) {
+                    ctx.shadowColor = '#00ff88';
+                    ctx.shadowBlur = 10;
+                    ctx.strokeStyle = '#fff';
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+                }
+                
+                ctx.restore();
+                
+                // Draw sensors for best
+                if (isBest && this.alive && showSensors) {
+                    const halfSpread = CONFIG.SENSOR_SPREAD / 2;
+                    const step = CONFIG.SENSOR_SPREAD / (CONFIG.SENSOR_COUNT - 1);
+                    
+                    for (let i = 0; i < CONFIG.SENSOR_COUNT; i++) {
+                        const ang = this.angle - halfSpread + step * i;
+                        const r = this.sensors[i];
+                        const endX = this.x + Math.cos(ang) * CONFIG.SENSOR_RANGE * r;
+                        const endY = this.y + Math.sin(ang) * CONFIG.SENSOR_RANGE * r;
+                        
+                        ctx.strokeStyle = r < 0.3 ? '#ff0066' : `rgba(0, 245, 255, ${0.3 + r * 0.5})`;
+                        ctx.lineWidth = r < 0.3 ? 2 : 1;
+                        ctx.beginPath();
+                        ctx.moveTo(this.x, this.y);
+                        ctx.lineTo(endX, endY);
+                        ctx.stroke();
+                        
+                        if (this.sensorHits[i]) {
+                            ctx.fillStyle = r < 0.3 ? '#ff0066' : '#00f5ff';
+                            ctx.beginPath();
+                            ctx.arc(this.sensorHits[i].x, this.sensorHits[i].y, 3, 0, Math.PI * 2);
+                            ctx.fill();
+                        }
+                    }
+                }
+            }
+        }
+
+        // ============== TOAST SYSTEM ==============
+        function showToast(message, type = 'success') {
+            const existing = document.querySelector('.toast');
+            if (existing) existing.remove();
+            
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.textContent = message;
+            if (type === 'warning') {
+                toast.style.background = 'linear-gradient(135deg, #ffaa00, #ff6600)';
+            } else if (type === 'info') {
+                toast.style.background = 'linear-gradient(135deg, #00f5ff, #0088ff)';
+            }
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        }
+
+        let lastOptimalToastGen = 0;
+
+        function checkOptimalLineProximity() {
+            if (allTimeBestPath.length < 20 || track.optimalLine.length < 20) return;
+            if (generation - lastOptimalToastGen < 5) return; // Don't spam toasts
+            
+            let totalDistance = 0;
+            const sampleCount = Math.min(30, allTimeBestPath.length, track.optimalLine.length);
+            
+            for (let i = 0; i < sampleCount; i++) {
+                const bIdx = Math.floor(i / sampleCount * allTimeBestPath.length);
+                const oIdx = Math.floor(i / sampleCount * track.optimalLine.length);
+                
+                const bp = allTimeBestPath[bIdx];
+                const op = track.optimalLine[oIdx];
+                
+                if (bp && op) {
+                    const d = Math.sqrt((bp.x - op.x)**2 + (bp.y - op.y)**2);
+                    totalDistance += d;
+                }
+            }
+            
+            const avgDistance = totalDistance / sampleCount;
+            if (avgDistance < CONFIG.TRACK_WIDTH * 0.5) {
+                showToast('🏆 Racing line approaching optimal!', 'success');
+                lastOptimalToastGen = generation;
+            }
+        }
+
+        // ============== TRACK GENERATORS ==============
+        function generateOval() {
+            track.clear();
+            clearRacingLines();
+            
+            const cx = mainCanvas.width / 2;
+            const cy = mainCanvas.height / 2;
+            const rx = mainCanvas.width * 0.35;
+            const ry = mainCanvas.height * 0.35;
+            
+            const pts = [];
+            for (let i = 0; i < 60; i++) {
+                const a = (i / 60) * Math.PI * 2;
+                pts.push({
+                    x: cx + Math.cos(a) * rx,
+                    y: cy + Math.sin(a) * ry
+                });
+            }
+            track.addPath(pts, 0);
+            resetAgentsOnly();
+        }
+        
+        function generateFigure8() {
+            track.clear();
+            clearRacingLines();
+            
+            const cx = mainCanvas.width / 2;
+            const cy = mainCanvas.height / 2;
+            const scale = Math.min(mainCanvas.width, mainCanvas.height) * 0.3;
+            
+            const pts = [];
+            const steps = 100;
+            
+            // Lemniscate (proper figure-8)
+            for (let i = 0; i < steps; i++) {
+                const t = (i / steps) * Math.PI * 2;
+                // Parametric lemniscate of Gerono
+                const x = Math.cos(t) * scale;
+                const y = Math.sin(t) * Math.cos(t) * scale;
+                pts.push({ x: cx + x, y: cy + y });
+            }
+            
+            track.addPath(pts, 0);
+            resetAgentsOnly();
+        }
+        
+        function generateRandomTrack() {
+            track.clear();
+            clearRacingLines();
+            
+            const cx = mainCanvas.width / 2;
+            const cy = mainCanvas.height / 2;
+            const numPts = 10 + Math.floor(Math.random() * 6);
+            const pts = [];
+            
+            for (let i = 0; i < numPts; i++) {
+                const a = (i / numPts) * Math.PI * 2;
+                const r = Math.min(mainCanvas.width, mainCanvas.height) * (0.25 + Math.random() * 0.12);
+                pts.push({
+                    x: cx + Math.cos(a) * r,
+                    y: cy + Math.sin(a) * r
+                });
+            }
+            
+            // Catmull-Rom spline
+            const smooth = catmullRom(pts, 8, true);
+            track.addPath(smooth, 0);
+            resetAgentsOnly();
+        }
+        
+        function catmullRom(pts, detail, closed) {
+            const result = [];
+            const n = pts.length;
+            
+            for (let i = 0; i < n; i++) {
+                const p0 = pts[(i - 1 + n) % n];
+                const p1 = pts[i];
+                const p2 = pts[(i + 1) % n];
+                const p3 = pts[(i + 2) % n];
+                
+                for (let t = 0; t < 1; t += 1/detail) {
+                    const t2 = t * t, t3 = t2 * t;
+                    result.push({
+                        x: 0.5 * ((2*p1.x) + (-p0.x + p2.x)*t + (2*p0.x - 5*p1.x + 4*p2.x - p3.x)*t2 + (-p0.x + 3*p1.x - 3*p2.x + p3.x)*t3),
+                        y: 0.5 * ((2*p1.y) + (-p0.y + p2.y)*t + (2*p0.y - 5*p1.y + 4*p2.y - p3.y)*t2 + (-p0.y + 3*p1.y - 3*p2.y + p3.y)*t3)
+                    });
+                }
+            }
+            return result;
+        }
+
+        // ============== GENETIC ALGORITHM ==============
+        function evolve() {
+            const sorted = [...agents].sort((a, b) => b.fitness - a.fitness);
+            
+            // Record history
+            const avgFit = agents.reduce((s, a) => s + a.fitness, 0) / agents.length;
+            const bestFit = sorted[0].fitness;
+            const lapsThisGen = agents.reduce((s, a) => s + a.laps, 0);
+            const avgSpd = agents.reduce((s, a) => s + a.avgSpeed, 0) / agents.length;
+            totalLaps += lapsThisGen;
+            
+            fitnessHistory.push({ avg: avgFit, best: bestFit, laps: lapsThisGen, avgSpeed: avgSpd });
+            if (fitnessHistory.length > 80) fitnessHistory.shift();
+            
+            // Save best brain
+            bestBrain = sorted[0].brain.clone();
+            
+            // Update best paths - use the agent with most checkpoints/best lap
+            const bestPathAgent = sorted[0];
+            if (bestPathAgent.path.length > 10) {
+                currentBestPath = [...bestPathAgent.path];
+                
+                // Update all-time best if this agent completed a lap or has better progress
+                if (bestPathAgent.laps > 0 || 
+                    (bestPathAgent.cpIndex > 0 && bestPathAgent.path.length > allTimeBestPath.length * 0.8)) {
+                    if (bestPathAgent.laps > 0 && bestPathAgent.bestLap < bestLapTime) {
+                        allTimeBestPath = [...bestPathAgent.path];
+                        bestLapTime = bestPathAgent.bestLap;
+                    } else if (allTimeBestPath.length === 0 && bestPathAgent.path.length > 50) {
+                        allTimeBestPath = [...bestPathAgent.path];
+                    }
+                }
+            }
+            
+            // Check if near optimal
+            checkOptimalLineProximity();
+            
+            // Create new generation
+            const newBrains = [];
+            
+            // Elitism - keep top performers unchanged
+            for (let i = 0; i < CONFIG.ELITE_COUNT; i++) {
+                newBrains.push(sorted[i].brain.clone());
+            }
+            
+            if (useCrossover) {
+                // POOLED LEARNING: Crossover + Mutation
+                // Breed rest with tournament selection
+                while (newBrains.length < CONFIG.AGENT_COUNT) {
+                    if (Math.random() < 0.7) {
+                        // Crossover between two fit parents
+                        const a = tournament(sorted);
+                        const b = tournament(sorted);
+                        const child = Brain.crossover(a.brain, b.brain);
+                        child.mutate(CONFIG.MUTATION_RATE, CONFIG.MUTATION_AMT);
+                        newBrains.push(child);
+                    } else {
+                        // Clone best and mutate more aggressively
+                        const parent = tournament(sorted);
+                        const child = parent.brain.clone();
+                        child.mutate(CONFIG.MUTATION_RATE * 1.5, CONFIG.MUTATION_AMT * 1.2);
+                        newBrains.push(child);
+                    }
+                }
+            } else {
+                // INDIVIDUAL LEARNING: No crossover, only mutation from elite
+                // Each agent learns independently - prevents slow gene contamination
+                while (newBrains.length < CONFIG.AGENT_COUNT) {
+                    // Select from top performers with strong bias toward best
+                    const parentIdx = Math.floor(Math.pow(Math.random(), 3) * Math.min(15, sorted.length));
+                    const parent = sorted[parentIdx];
+                    const child = parent.brain.clone();
+                    
+                    // More aggressive mutation for exploration
+                    const mutRate = CONFIG.MUTATION_RATE * (1 + parentIdx * 0.1);
+                    const mutAmt = CONFIG.MUTATION_AMT * (1 + parentIdx * 0.05);
+                    child.mutate(mutRate, mutAmt);
+                    newBrains.push(child);
+                }
+            }
+            
+            // Adaptive mutation - increase if stagnating, decrease if improving
+            if (fitnessHistory.length > 10) {
+                const recent = fitnessHistory.slice(-10);
+                const older = fitnessHistory.slice(-20, -10);
+                
+                const recentBest = Math.max(...recent.map(f => f.best));
+                const olderBest = older.length > 0 ? Math.max(...older.map(f => f.best)) : 0;
+                
+                const improvement = recentBest - olderBest;
+                
+                if (improvement < 50) {
+                    // Stagnating - increase exploration
+                    CONFIG.MUTATION_RATE = Math.min(0.35, CONFIG.MUTATION_RATE + 0.01);
+                    CONFIG.MUTATION_AMT = Math.min(0.6, CONFIG.MUTATION_AMT + 0.02);
+                } else if (improvement > 200) {
+                    // Improving well - focus exploitation
+                    CONFIG.MUTATION_RATE = Math.max(0.08, CONFIG.MUTATION_RATE - 0.01);
+                    CONFIG.MUTATION_AMT = Math.max(0.2, CONFIG.MUTATION_AMT - 0.01);
+                }
+                
+                document.getElementById('mutRate').textContent = Math.round(CONFIG.MUTATION_RATE * 100) + '%';
+            }
+            
+            // Check for speed degradation and warn
+            if (fitnessHistory.length > 20) {
+                const recentSpeeds = fitnessHistory.slice(-10).map(f => f.avgSpeed || 0);
+                const olderSpeeds = fitnessHistory.slice(-20, -10).map(f => f.avgSpeed || 0);
+                const recentAvg = recentSpeeds.reduce((a,b) => a+b, 0) / recentSpeeds.length;
+                const olderAvg = olderSpeeds.reduce((a,b) => a+b, 0) / olderSpeeds.length;
+                
+                if (olderAvg > 0 && recentAvg < olderAvg * 0.7 && generation % 10 === 0) {
+                    showToast('⚠️ Speed degrading! Try Individual Learning mode', 'warning');
+                }
+            }
+            
+            generation++;
+            frameCount = 0;
+            spawnAgents(newBrains);
+        }
+        
+        function tournament(sortedAgents, size = 5) {
+            // Tournament selection from pre-sorted agents (biased toward top)
+            let bestIdx = sortedAgents.length - 1;
+            for (let i = 0; i < size; i++) {
+                // Exponential distribution favoring top agents
+                const idx = Math.floor(Math.pow(Math.random(), 2) * sortedAgents.length);
+                if (idx < bestIdx) bestIdx = idx;
+            }
+            return sortedAgents[bestIdx];
+        }
+        
+        function toggleCrossover() {
+            useCrossover = !useCrossover;
+            document.getElementById('toggleCrossover').classList.toggle('active', useCrossover);
+            document.getElementById('learningMode').textContent = useCrossover ? 'Pooled' : 'Individual';
+            showToast(useCrossover ? '🔀 Pooled Learning (Crossover ON)' : '🧬 Individual Learning (Mutation Only)', 'info');
+        }
+        
+        function toggleSpeedPriority() {
+            speedPriority = !speedPriority;
+            document.getElementById('toggleSpeedPriority').classList.toggle('active', speedPriority);
+            showToast(speedPriority ? '🏎️ Speed Priority ON - Fast agents rewarded!' : '🐢 Speed Priority OFF - Survival focus', 'info');
+        }
+
+        // ============== VISUALIZATION ==============
+        function drawTrack(ctx) {
+            // Draw track surface
+            ctx.strokeStyle = '#1a1a4a';
+            ctx.lineWidth = CONFIG.TRACK_WIDTH * 2;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            
+            track.paths.forEach(p => {
+                if (p.points.length < 2) return;
+                ctx.beginPath();
+                ctx.moveTo(p.points[0].x, p.points[0].y);
+                p.points.forEach(pt => ctx.lineTo(pt.x, pt.y));
+                ctx.closePath();
+                ctx.stroke();
+            });
+            
+            // Draw walls
+            track.walls.forEach(w => {
+                ctx.strokeStyle = w.level === 0 ? '#00aaff' : '#ff6600';
+                ctx.lineWidth = 3;
+                ctx.lineCap = 'round';
+                ctx.beginPath();
+                ctx.moveTo(w.x1, w.y1);
+                ctx.lineTo(w.x2, w.y2);
+                ctx.stroke();
+                
+                // Glow
+                ctx.strokeStyle = w.level === 0 ? 'rgba(0,170,255,0.2)' : 'rgba(255,100,0,0.2)';
+                ctx.lineWidth = 6;
+                ctx.stroke();
+            });
+            
+            // Checkpoints
+            if (displayOpts.checkpoints) {
+                track.checkpoints.forEach((cp, i) => {
+                    ctx.fillStyle = `hsla(${i * 25}, 80%, 50%, 0.15)`;
+                    ctx.beginPath();
+                    ctx.arc(cp.x, cp.y, cp.radius, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    ctx.fillStyle = '#666';
+                    ctx.font = '10px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(i + 1, cp.x, cp.y + 3);
+                });
+            }
+            
+            // Start line
+            if (track.paths.length > 0) {
+                ctx.save();
+                ctx.translate(track.startX, track.startY);
+                ctx.rotate(track.startAngle);
+                ctx.strokeStyle = '#00ff88';
+                ctx.lineWidth = 4;
+                ctx.beginPath();
+                ctx.moveTo(-15, -CONFIG.TRACK_WIDTH * 0.7);
+                ctx.lineTo(-15, CONFIG.TRACK_WIDTH * 0.7);
+                ctx.stroke();
+                ctx.restore();
+            }
+            
+            // Racing lines
+            if (displayOpts.racingLine) {
+                // All-time best (green)
+                if (allTimeBestPath.length > 1) {
+                    ctx.strokeStyle = 'rgba(0, 255, 136, 0.5)';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(allTimeBestPath[0].x, allTimeBestPath[0].y);
+                    allTimeBestPath.forEach(p => ctx.lineTo(p.x, p.y));
+                    ctx.stroke();
+                }
+                
+                // Current best (yellow)
+                if (currentBestPath.length > 1) {
+                    ctx.strokeStyle = 'rgba(255, 255, 0, 0.4)';
+                    ctx.lineWidth = 2;
+                    ctx.setLineDash([5, 5]);
+                    ctx.beginPath();
+                    ctx.moveTo(currentBestPath[0].x, currentBestPath[0].y);
+                    currentBestPath.forEach(p => ctx.lineTo(p.x, p.y));
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                }
+                
+                // Optimal racing line (magenta)
+                if (track.optimalLine.length > 1) {
+                    ctx.strokeStyle = 'rgba(255, 0, 255, 0.3)';
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.moveTo(track.optimalLine[0].x, track.optimalLine[0].y);
+                    track.optimalLine.forEach(p => ctx.lineTo(p.x, p.y));
+                    ctx.closePath();
+                    ctx.stroke();
+                }
+            }
+        }
+        
+        function drawBrain(ctx, brain) {
+            const w = ctx.canvas.width, h = ctx.canvas.height;
+            ctx.fillStyle = '#0a0a15';
+            ctx.fillRect(0, 0, w, h);
+            
+            const layers = [5, 8, 2];
+            const positions = [];
+            const spacing = w / 4;
+            
+            for (let l = 0; l < 3; l++) {
+                positions[l] = [];
+                const ns = Math.min(12, (h - 15) / layers[l]);
+                const sy = (h - (layers[l] - 1) * ns) / 2;
+                for (let n = 0; n < layers[l]; n++) {
+                    positions[l].push({ x: spacing * (l + 1), y: sy + n * ns });
+                }
+            }
+            
+            // Connections layer 1
+            ctx.lineWidth = 0.5;
+            for (let i = 0; i < 5; i++) {
+                for (let j = 0; j < 8; j++) {
+                    const act = Math.abs((brain.activations.input[i] || 0) * (brain.activations.hidden[j] || 0));
+                    if (act > 0.02) {
+                        const wt = brain.w1[j][i];
+                        ctx.strokeStyle = wt > 0 ? `rgba(0,245,255,${act})` : `rgba(255,0,102,${act})`;
+                        ctx.beginPath();
+                        ctx.moveTo(positions[0][i].x, positions[0][i].y);
+                        ctx.lineTo(positions[1][j].x, positions[1][j].y);
+                        ctx.stroke();
+                    }
+                }
+            }
+            
+            // Connections layer 2
+            for (let i = 0; i < 8; i++) {
+                for (let j = 0; j < 2; j++) {
+                    const act = Math.abs((brain.activations.hidden[i] || 0) * (brain.activations.output[j] || 0));
+                    if (act > 0.02) {
+                        const wt = brain.w2[j][i];
+                        ctx.strokeStyle = wt > 0 ? `rgba(0,245,255,${act})` : `rgba(255,0,102,${act})`;
+                        ctx.beginPath();
+                        ctx.moveTo(positions[1][i].x, positions[1][i].y);
+                        ctx.lineTo(positions[2][j].x, positions[2][j].y);
+                        ctx.stroke();
+                    }
+                }
+            }
+            
+            // Nodes
+            for (let l = 0; l < 3; l++) {
+                const acts = l === 0 ? brain.activations.input : (l === 1 ? brain.activations.hidden : brain.activations.output);
+                for (let n = 0; n < layers[l]; n++) {
+                    const v = acts[n] || 0;
+                    const intensity = Math.min(1, Math.abs(v));
+                    ctx.fillStyle = v >= 0 ? `rgba(0,245,255,${0.3 + intensity * 0.7})` : `rgba(255,0,102,${0.3 + intensity * 0.7})`;
+                    ctx.beginPath();
+                    ctx.arc(positions[l][n].x, positions[l][n].y, 4, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+            
+            // Labels
+            ctx.fillStyle = '#555';
+            ctx.font = '8px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('Sensors', positions[0][0].x, h - 3);
+            ctx.fillText('Hidden', positions[1][0].x, h - 3);
+            ctx.fillText('Output', positions[2][0].x, h - 3);
+        }
+        
+        function drawHeatmap(ctx, agents) {
+            const w = ctx.canvas.width, h = ctx.canvas.height;
+            ctx.fillStyle = '#0a0a15';
+            ctx.fillRect(0, 0, w, h);
+            
+            const sx = w / mainCanvas.width, sy = h / mainCanvas.height;
+            
+            // Mini track
+            ctx.strokeStyle = '#222';
+            ctx.lineWidth = 0.5;
+            track.walls.forEach(wall => {
+                ctx.beginPath();
+                ctx.moveTo(wall.x1 * sx, wall.y1 * sy);
+                ctx.lineTo(wall.x2 * sx, wall.y2 * sy);
+                ctx.stroke();
+            });
+            
+            // Heat
+            const heat = new Map();
+            const gs = 3;
+            
+            agents.forEach(a => {
+                a.path.forEach(p => {
+                    const gx = Math.floor(p.x * sx / gs);
+                    const gy = Math.floor(p.y * sy / gs);
+                    const k = `${gx},${gy}`;
+                    heat.set(k, (heat.get(k) || 0) + 1);
+                });
+            });
+            
+            let max = 1;
+            heat.forEach(v => { if (v > max) max = v; });
+            
+            heat.forEach((v, k) => {
+                const [gx, gy] = k.split(',').map(Number);
+                const i = v / max;
+                ctx.fillStyle = `hsla(${240 - i * 200}, 100%, 50%, ${0.2 + i * 0.6})`;
+                ctx.fillRect(gx * gs, gy * gs, gs, gs);
+            });
+        }
+        
+        function drawFitnessChart(ctx) {
+            const w = ctx.canvas.width, h = ctx.canvas.height;
+            ctx.fillStyle = '#0a0a15';
+            ctx.fillRect(0, 0, w, h);
+            
+            if (fitnessHistory.length < 2) return;
+            
+            const maxFit = Math.max(...fitnessHistory.map(f => f.best), 100);
+            const maxLaps = Math.max(...fitnessHistory.map(f => f.laps), 1);
+            const pad = 5;
+            const cw = w - pad * 2, ch = h - pad * 2;
+            const step = cw / Math.max(fitnessHistory.length - 1, 1);
+            
+            // Avg line
+            ctx.strokeStyle = '#00f5ff';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            fitnessHistory.forEach((f, i) => {
+                const x = pad + i * step;
+                const y = pad + ch - (f.avg / maxFit) * ch;
+                i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+            });
+            ctx.stroke();
+            
+            // Best line
+            ctx.strokeStyle = '#ff00ff';
+            ctx.beginPath();
+            fitnessHistory.forEach((f, i) => {
+                const x = pad + i * step;
+                const y = pad + ch - (f.best / maxFit) * ch;
+                i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+            });
+            ctx.stroke();
+            
+            // Laps
+            ctx.strokeStyle = '#00ff88';
+            ctx.beginPath();
+            fitnessHistory.forEach((f, i) => {
+                const x = pad + i * step;
+                const y = pad + ch - (f.laps / maxLaps) * ch * 0.5;
+                i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+            });
+            ctx.stroke();
+        }
+        
+        function drawRacingLinePreview(ctx) {
+            const w = ctx.canvas.width, h = ctx.canvas.height;
+            ctx.fillStyle = '#0a0a15';
+            ctx.fillRect(0, 0, w, h);
+            
+            const sx = w / mainCanvas.width, sy = h / mainCanvas.height;
+            
+            // Mini track
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 0.5;
+            track.walls.forEach(wall => {
+                ctx.beginPath();
+                ctx.moveTo(wall.x1 * sx, wall.y1 * sy);
+                ctx.lineTo(wall.x2 * sx, wall.y2 * sy);
+                ctx.stroke();
+            });
+            
+            // All-time best
+            if (allTimeBestPath.length > 1) {
+                ctx.strokeStyle = '#00ff88';
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.moveTo(allTimeBestPath[0].x * sx, allTimeBestPath[0].y * sy);
+                allTimeBestPath.forEach(p => ctx.lineTo(p.x * sx, p.y * sy));
+                ctx.stroke();
+            }
+            
+            // Current best
+            if (currentBestPath.length > 1) {
+                ctx.strokeStyle = '#ffff00';
+                ctx.lineWidth = 1;
+                ctx.setLineDash([2, 2]);
+                ctx.beginPath();
+                ctx.moveTo(currentBestPath[0].x * sx, currentBestPath[0].y * sy);
+                currentBestPath.forEach(p => ctx.lineTo(p.x * sx, p.y * sy));
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+            
+            // Optimal
+            if (track.optimalLine.length > 1) {
+                ctx.strokeStyle = '#ff00ff';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(track.optimalLine[0].x * sx, track.optimalLine[0].y * sy);
+                track.optimalLine.forEach(p => ctx.lineTo(p.x * sx, p.y * sy));
+                ctx.closePath();
+                ctx.stroke();
+            }
+        }
+
+        // ============== MAIN LOOP ==============
+        const mainCanvas = document.getElementById('mainCanvas');
+        const mainCtx = mainCanvas.getContext('2d');
+        const brainCanvas = document.getElementById('brainCanvas');
+        const brainCtx = brainCanvas.getContext('2d');
+        const heatmapCanvas = document.getElementById('heatmapCanvas');
+        const heatmapCtx = heatmapCanvas.getContext('2d');
+        const chartCanvas = document.getElementById('fitnessChart');
+        const chartCtx = chartCanvas.getContext('2d');
+        const racingLineCanvas = document.getElementById('racingLineCanvas');
+        const racingLineCtx = racingLineCanvas.getContext('2d');
+        const canvasWrapper = document.getElementById('canvasWrapper');
+        const canvasContainer = document.getElementById('canvasContainer');
+
+        let track = new Track();
+        let agents = [];
+        let generation = 1;
+        let frameCount = 0;
+        let useInt8 = false;
+        let paused = false;
+        let speed = 1;
+        let fitnessHistory = [];
+        let bestBrain = null;
+        let bestLapTime = Infinity;
+        let totalLaps = 0;
+        let zoom = 1;
+        let currentBestPath = [];
+        let allTimeBestPath = [];
+
+        let displayOpts = { sensors: true, agents: true, checkpoints: true, racingLine: false };
+        
+        // Evolution settings
+        let useCrossover = true;
+        let speedPriority = true;
+
+        // Drawing
+        let drawMode = false;
+        let isDrawing = false;
+        let drawPath = [];
+
+        function clearRacingLines() {
+            currentBestPath = [];
+            allTimeBestPath = [];
+            bestLapTime = Infinity;
+        }
+
+        function spawnAgents(brains = null) {
+            agents = [];
+            for (let i = 0; i < CONFIG.AGENT_COUNT; i++) {
+                const offset = (Math.random() - 0.5) * 15;
+                agents.push(new Agent(
+                    track.startX + offset * Math.sin(track.startAngle),
+                    track.startY - offset * Math.cos(track.startAngle),
+                    track.startAngle,
+                    brains ? brains[i] : null
+                ));
+            }
+        }
+
+        function updateStats() {
+            const alive = agents.filter(a => a.alive).length;
+            const best = Math.max(...agents.map(a => a.fitness), 0);
+            const avg = agents.reduce((s, a) => s + a.fitness, 0) / agents.length;
+            const maxCp = Math.max(...agents.map(a => a.laps * track.checkpoints.length + a.cpIndex), 0);
+            const maxSpd = Math.max(...agents.map(a => a.maxSpeed), 0);
+            const avgSpd = agents.filter(a => a.alive).reduce((s, a) => s + a.avgSpeed, 0) / Math.max(1, alive);
+            
+            document.getElementById('statGen').textContent = generation;
+            document.getElementById('footerGen').textContent = generation;
+            document.getElementById('footerFrame').textContent = frameCount;
+            document.getElementById('footerAlive').textContent = alive;
+            document.getElementById('statBest').textContent = Math.round(best);
+            document.getElementById('statAvg').textContent = Math.round(avg);
+            document.getElementById('statLaps').textContent = totalLaps;
+            document.getElementById('statSpeed').textContent = maxSpd.toFixed(1);
+            document.getElementById('avgSpeed').textContent = avgSpd.toFixed(2);
+            document.getElementById('footerCheckpoints').textContent = maxCp;
+            
+            // Update best lap from current agents
+            const agentBestLap = Math.min(...agents.filter(a => a.bestLap < Infinity).map(a => a.bestLap), Infinity);
+            if (agentBestLap < bestLapTime) bestLapTime = agentBestLap;
+            
+            if (bestLapTime < Infinity) {
+                const sec = (bestLapTime / 60).toFixed(2);
+                document.getElementById('statBestLap').textContent = sec + 's';
+                document.getElementById('footerBestLap').textContent = sec + 's';
+            }
+        }
+
+        function gameLoop() {
+            if (!paused) {
+                for (let s = 0; s < speed; s++) {
+                    // Find current best alive agent and track its path live
+                    const aliveAgents = agents.filter(a => a.alive);
+                    if (aliveAgents.length > 0) {
+                        const currentBest = aliveAgents.reduce((a, b) => a.fitness > b.fitness ? a : b);
+                        if (currentBest && currentBest.path.length > 0) {
+                            // Update current best path to follow the live best agent
+                            currentBestPath = [...currentBest.path];
+                        }
+                    }
+                    
+                    for (const agent of agents) {
+                        if (agent.alive) {
+                            agent.updateSensors(track.walls);
+                            agent.update(useInt8, track.checkpoints);
+                            agent.checkCollision(track.walls);
+                        }
+                    }
+                    frameCount++;
+                    
+                    if (frameCount >= CONFIG.GEN_FRAMES || agents.every(a => !a.alive)) {
+                        evolve();
+                    }
+                }
+            }
+            
+            // Render main canvas
+            mainCtx.save();
+            mainCtx.fillStyle = '#0a0a12';
+            mainCtx.fillRect(0, 0, mainCanvas.width, mainCanvas.height);
+            
+            drawTrack(mainCtx);
+            
+            if (displayOpts.agents) {
+                const sorted = [...agents].sort((a, b) => a.fitness - b.fitness);
+                const best = sorted[sorted.length - 1];
+                
+                for (const a of sorted) {
+                    if (a !== best) a.draw(mainCtx, false, false);
+                }
+                if (best) best.draw(mainCtx, true, displayOpts.sensors);
+            }
+            
+            // Draw current drawing preview
+            if (isDrawing && drawPath.length > 1) {
+                mainCtx.strokeStyle = '#ffff00';
+                mainCtx.lineWidth = 3;
+                mainCtx.setLineDash([5, 5]);
+                mainCtx.lineCap = 'round';
+                mainCtx.lineJoin = 'round';
+                mainCtx.beginPath();
+                mainCtx.moveTo(drawPath[0].x, drawPath[0].y);
+                drawPath.forEach(p => mainCtx.lineTo(p.x, p.y));
+                mainCtx.stroke();
+                mainCtx.setLineDash([]);
+                
+                // Preview track width
+                mainCtx.strokeStyle = 'rgba(0,255,255,0.2)';
+                mainCtx.lineWidth = CONFIG.TRACK_WIDTH * 2;
+                mainCtx.lineCap = 'round';
+                mainCtx.beginPath();
+                mainCtx.moveTo(drawPath[0].x, drawPath[0].y);
+                drawPath.forEach(p => mainCtx.lineTo(p.x, p.y));
+                mainCtx.stroke();
+            }
+            
+            mainCtx.restore();
+            
+            // Side panels
+            const best = agents.reduce((a, b) => (a?.fitness || 0) > (b?.fitness || 0) ? a : b, null);
+            if (best) {
+                drawBrain(brainCtx, best.brain);
+            } else if (bestBrain) {
+                drawBrain(brainCtx, bestBrain);
+            }
+            
+            drawHeatmap(heatmapCtx, agents);
+            drawFitnessChart(chartCtx);
+            drawRacingLinePreview(racingLineCtx);
+            
+            updateStats();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // ============== INPUT HANDLING ==============
+        function getCanvasPos(e) {
+            const rect = mainCanvas.getBoundingClientRect();
+            const scaleX = mainCanvas.width / rect.width;
+            const scaleY = mainCanvas.height / rect.height;
+            
+            let clientX, clientY;
+            if (e.touches && e.touches.length > 0) {
+                clientX = e.touches[0].clientX;
+                clientY = e.touches[0].clientY;
+            } else if (e.changedTouches && e.changedTouches.length > 0) {
+                clientX = e.changedTouches[0].clientX;
+                clientY = e.changedTouches[0].clientY;
+            } else {
+                clientX = e.clientX;
+                clientY = e.clientY;
+            }
+            
+            return {
+                x: (clientX - rect.left) * scaleX,
+                y: (clientY - rect.top) * scaleY
+            };
+        }
+
+        function startDraw(e) {
+            if (!drawMode) return;
+            e.preventDefault();
+            e.stopPropagation();
+            isDrawing = true;
+            drawPath = [getCanvasPos(e)];
+        }
+
+        function moveDraw(e) {
+            if (!isDrawing) return;
+            e.preventDefault();
+            e.stopPropagation();
+            const pos = getCanvasPos(e);
+            const last = drawPath[drawPath.length - 1];
+            const d = Math.sqrt((pos.x - last.x)**2 + (pos.y - last.y)**2);
+            if (d > 8) drawPath.push(pos);
+        }
+
+        function endDraw(e) {
+            if (!isDrawing) return;
+            e.preventDefault();
+            e.stopPropagation();
+            
+            if (drawPath.length > 5) {
+                // Close the path if endpoints are close
+                const first = drawPath[0];
+                const last = drawPath[drawPath.length - 1];
+                const dist = Math.sqrt((first.x - last.x)**2 + (first.y - last.y)**2);
+                
+                if (dist < 50) {
+                    // Close the loop
+                    drawPath.push({ x: first.x, y: first.y });
+                }
+                
+                const level = track.paths.length;
+                track.addPath(drawPath, level);
+                clearRacingLines();
+                resetAgentsOnly();
+            }
+            
+            isDrawing = false;
+            drawPath = [];
+        }
+
+        mainCanvas.addEventListener('mousedown', startDraw);
+        mainCanvas.addEventListener('mousemove', moveDraw);
+        mainCanvas.addEventListener('mouseup', endDraw);
+        mainCanvas.addEventListener('mouseleave', endDraw);
+
+        mainCanvas.addEventListener('touchstart', startDraw, { passive: false });
+        mainCanvas.addEventListener('touchmove', moveDraw, { passive: false });
+        mainCanvas.addEventListener('touchend', endDraw, { passive: false });
+
+        // Zoom with scroll/pinch
+        let lastTouchDist = 0;
+
+        canvasWrapper.addEventListener('wheel', (e) => {
+            if (drawMode) return; // Don't zoom while drawing
+            e.preventDefault();
+            const delta = e.deltaY > 0 ? -0.1 : 0.1;
+            setZoom(zoom + delta);
+        }, { passive: false });
+
+        canvasWrapper.addEventListener('touchstart', (e) => {
+            if (e.touches.length === 2) {
+                const dx = e.touches[0].clientX - e.touches[1].clientX;
+                const dy = e.touches[0].clientY - e.touches[1].clientY;
+                lastTouchDist = Math.sqrt(dx*dx + dy*dy);
+            }
+        });
+
+        canvasWrapper.addEventListener('touchmove', (e) => {
+            if (e.touches.length === 2 && !drawMode) {
+                e.preventDefault();
+                const dx = e.touches[0].clientX - e.touches[1].clientX;
+                const dy = e.touches[0].clientY - e.touches[1].clientY;
+                const dist = Math.sqrt(dx*dx + dy*dy);
+                const delta = (dist - lastTouchDist) * 0.005;
+                setZoom(zoom + delta);
+                lastTouchDist = dist;
+            }
+        }, { passive: false });
+
+        function setZoom(z) {
+            zoom = Math.max(0.25, Math.min(3, z));
+            canvasContainer.style.transform = `scale(${zoom})`;
+            document.getElementById('zoomLevel').textContent = Math.round(zoom * 100) + '%';
+        }
+
+        // ============== CONTROLS ==============
+        function togglePause() {
+            paused = !paused;
+            document.getElementById('pauseBtn').textContent = paused ? '▶ Play' : '⏸ Pause';
+        }
+
+        function cycleSpeed() {
+            const speeds = [1, 2, 5, 10, 20];
+            speed = speeds[(speeds.indexOf(speed) + 1) % speeds.length];
+            document.getElementById('speedBtn').textContent = `⚡ ${speed}x`;
+        }
+
+        function resetSimulation() {
+            generation = 1;
+            frameCount = 0;
+            fitnessHistory = [];
+            bestBrain = null;
+            bestLapTime = Infinity;
+            totalLaps = 0;
+            currentBestPath = [];
+            allTimeBestPath = [];
+            CONFIG.MUTATION_RATE = 0.15;
+            CONFIG.MUTATION_AMT = 0.4;
+            document.getElementById('mutRate').textContent = '15%';
+            document.getElementById('avgSpeed').textContent = '0';
+            document.getElementById('statBestLap').textContent = '--';
+            document.getElementById('footerBestLap').textContent = '--';
+            generateRandomTrack();
+        }
+
+        function resetAgentsOnly() {
+            frameCount = 0;
+            currentBestPath = [];
+            spawnAgents();
+        }
+
+        function toggleDrawMode() {
+            drawMode = !drawMode;
+            document.getElementById('drawBtn').classList.toggle('active', drawMode);
+            document.getElementById('drawingInfo').classList.toggle('active', drawMode);
+            document.getElementById('drawModeStatus').textContent = drawMode ? '✏️ Drawing Mode' : '';
+            
+            if (drawMode) {
+                mainCanvas.style.cursor = 'crosshair';
+            } else {
+                mainCanvas.style.cursor = 'default';
+            }
+        }
+
+        function clearTrack() {
+            track.clear();
+            clearRacingLines();
+            totalLaps = 0;
+        }
+
+        function toggleOption(opt) {
+            displayOpts[opt] = !displayOpts[opt];
+            const el = document.getElementById('toggle' + opt.charAt(0).toUpperCase() + opt.slice(1));
+            if (el) el.classList.toggle('active', displayOpts[opt]);
+        }
+
+        function setPrecision(mode) {
+            useInt8 = mode === 'int8';
+            document.getElementById('btnFloat32').classList.toggle('active', !useInt8);
+            document.getElementById('btnInt8').classList.toggle('active', useInt8);
+            document.getElementById('memoryFill').style.width = useInt8 ? '25%' : '100%';
+            document.getElementById('memoryText').textContent = useInt8 ? '32 KB' : '128 KB';
+            document.getElementById('inferenceQuality').textContent = useInt8 ? '~85%' : '100%';
+            document.getElementById('inferenceQuality').className = 'stat-value ' + (useInt8 ? 'warning' : 'good');
+        }
+
+        function resizeCanvas() {
+            const w = Math.max(600, Math.min(4000, parseInt(document.getElementById('canvasWidth').value) || 1400));
+            const h = Math.max(400, Math.min(3000, parseInt(document.getElementById('canvasHeight').value) || 800));
+            mainCanvas.width = w;
+            mainCanvas.height = h;
+            canvasContainer.style.width = w + 'px';
+            canvasContainer.style.height = h + 'px';
+            document.getElementById('canvasWidth').value = w;
+            document.getElementById('canvasHeight').value = h;
+            
+            // Regenerate track and reset
+            clearRacingLines();
+            if (track.paths.length > 0) {
+                generateRandomTrack();
+            }
+        }
+
+        function zoomIn() { setZoom(zoom + 0.15); }
+        function zoomOut() { setZoom(zoom - 0.15); }
+        function resetZoom() { setZoom(1); }
+
+        function exportWeights() {
+            const brain = bestBrain || (agents.length ? agents.reduce((a, b) => a.fitness > b.fitness ? a : b).brain : null);
+            if (brain) {
+                document.getElementById('exportData').value = brain.toJSON();
+            }
+        }
+
+        function downloadWeights() {
+            exportWeights();
+            const data = document.getElementById('exportData').value;
+            if (!data) return;
+            
+            const blob = new Blob([data], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `brain_gen${generation}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // ============== INIT ==============
+        // Set initial container size
+        canvasContainer.style.width = mainCanvas.width + 'px';
+        canvasContainer.style.height = mainCanvas.height + 'px';
+        
+        generateRandomTrack();
+        gameLoop();
+    </script>
+</body>
+</html>
