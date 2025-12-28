@@ -1,0 +1,1294 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Interactive 3D Heart - Educational Experience</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: radial-gradient(ellipse at center, #1a0a2e 0%, #0a0a1a 70%, #050510 100%);
+            overflow: hidden;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            color: #fff;
+        }
+
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+            position: fixed;
+            top: 0;
+            left: 0;
+        }
+
+        .panel {
+            background: rgba(10, 10, 30, 0.85);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 16px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+            z-index: 10;
+        }
+
+        #main-panel {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            width: 280px;
+            padding: 18px;
+            max-height: calc(100vh - 40px);
+            overflow-y: auto;
+        }
+
+        #main-panel::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        #main-panel::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 2px;
+        }
+
+        .panel-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .panel-header h2 {
+            font-size: 1.2em;
+            font-weight: 600;
+            background: linear-gradient(135deg, #ff6b6b, #ff8e8e);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .heart-icon {
+            font-size: 1.6em;
+            animation: heartbeat 1s ease-in-out infinite;
+        }
+
+        @keyframes heartbeat {
+
+            0%,
+            100% {
+                transform: scale(1);
+            }
+
+            15% {
+                transform: scale(1.2);
+            }
+
+            30% {
+                transform: scale(1);
+            }
+
+            45% {
+                transform: scale(1.1);
+            }
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-bottom: 14px;
+        }
+
+        .stat-card {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 10px;
+            padding: 12px;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .stat-card.highlight {
+            background: linear-gradient(135deg, rgba(255, 107, 107, 0.12), rgba(255, 142, 142, 0.04));
+            border-color: rgba(255, 107, 107, 0.15);
+        }
+
+        .stat-value {
+            font-size: 1.4em;
+            font-weight: 700;
+            margin-bottom: 2px;
+        }
+
+        .stat-value.bpm {
+            color: #ff6b6b;
+        }
+
+        .stat-value.co {
+            color: #7bed9f;
+        }
+
+        .stat-label {
+            font-size: 0.65em;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .section {
+            background: rgba(0, 0, 0, 0.25);
+            border-radius: 10px;
+            padding: 12px;
+            margin-bottom: 12px;
+        }
+
+        .section h3 {
+            font-size: 0.7em;
+            color: #555;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .timeline-bar {
+            height: 5px;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 3px;
+            overflow: hidden;
+            margin-bottom: 6px;
+        }
+
+        .timeline-progress {
+            height: 100%;
+            background: linear-gradient(90deg, #ff6b6b, #4ecdc4, #667eea);
+            border-radius: 3px;
+            transition: width 0.05s linear;
+        }
+
+        .current-phase {
+            text-align: center;
+            padding: 8px;
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.05));
+            border-radius: 6px;
+        }
+
+        .phase-name {
+            font-size: 0.9em;
+            font-weight: 600;
+            color: #fff;
+            margin-bottom: 2px;
+        }
+
+        .phase-desc {
+            font-size: 0.72em;
+            color: #777;
+        }
+
+        .valve-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+        }
+
+        .valve-card {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+            padding: 8px;
+            border: 2px solid transparent;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+
+        .valve-card:hover {
+            background: rgba(255, 255, 255, 0.03);
+        }
+
+        .valve-card.open {
+            border-color: #4ecdc4;
+            box-shadow: 0 0 10px rgba(78, 205, 196, 0.2);
+        }
+
+        .valve-card.closed {
+            border-color: rgba(255, 107, 107, 0.4);
+        }
+
+        .valve-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2px;
+        }
+
+        .valve-name {
+            font-weight: 600;
+            font-size: 0.78em;
+        }
+
+        .valve-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            transition: all 0.3s;
+        }
+
+        .valve-dot.open {
+            background: #4ecdc4;
+            box-shadow: 0 0 6px #4ecdc4;
+        }
+
+        .valve-dot.closed {
+            background: #ff6b6b;
+        }
+
+        .valve-type {
+            font-size: 0.62em;
+            color: #555;
+        }
+
+        .slider-control {
+            margin-bottom: 10px;
+        }
+
+        .slider-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+        }
+
+        .slider-label {
+            font-size: 0.8em;
+            color: #999;
+        }
+
+        .slider-value {
+            font-weight: 600;
+            color: #ff6b6b;
+            font-size: 0.8em;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 4px;
+            -webkit-appearance: none;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 2px;
+            outline: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            background: linear-gradient(135deg, #ff6b6b, #ff8e8e);
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(255, 107, 107, 0.3);
+        }
+
+        .btn-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+            margin-bottom: 12px;
+        }
+
+        .btn {
+            padding: 8px 10px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.72em;
+            font-weight: 500;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 3px 12px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.06);
+            color: #999;
+            border: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+        }
+
+        .btn.active {
+            background: linear-gradient(135deg, #f093fb, #f5576c);
+            color: #fff;
+        }
+
+        .btn-full {
+            grid-column: span 2;
+        }
+
+        /* Blood Legend - now inline in main panel */
+        .legend-inline {
+            display: flex;
+            gap: 8px;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+        }
+
+        .legend-item-inline {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex: 1;
+        }
+
+        .legend-dot {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.6em;
+            font-weight: 700;
+        }
+
+        .legend-dot.oxy {
+            background: linear-gradient(135deg, #ff3333, #ff6666);
+            box-shadow: 0 0 10px rgba(255, 51, 51, 0.25);
+        }
+
+        .legend-dot.deoxy {
+            background: linear-gradient(135deg, #3344ff, #5566ff);
+            box-shadow: 0 0 10px rgba(51, 68, 255, 0.25);
+        }
+
+        .legend-text-inline {
+            font-size: 0.68em;
+            color: #888;
+        }
+
+        .legend-text-inline strong {
+            display: block;
+            color: #ccc;
+            font-size: 1.1em;
+        }
+
+        /* Info Panel */
+        #info-panel {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 300px;
+            padding: 18px;
+            max-height: calc(100vh - 160px);
+            overflow-y: auto;
+        }
+
+        .info-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .info-header h3 {
+            font-size: 1em;
+            font-weight: 600;
+        }
+
+        .info-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1em;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+        }
+
+        .info-content {
+            font-size: 0.85em;
+            line-height: 1.55;
+            color: #bbb;
+        }
+
+        .info-content p {
+            margin-bottom: 10px;
+        }
+
+        .info-content strong {
+            color: #fff;
+        }
+
+        .fact-box {
+            background: rgba(78, 205, 196, 0.08);
+            border-left: 3px solid #4ecdc4;
+            padding: 10px;
+            border-radius: 0 6px 6px 0;
+            margin: 10px 0;
+            font-size: 0.9em;
+        }
+
+        .fact-box .fact-title {
+            font-weight: 600;
+            color: #4ecdc4;
+            margin-bottom: 3px;
+            font-size: 0.75em;
+            text-transform: uppercase;
+        }
+
+        /* ECG Panel */
+        #ecg-panel {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 360px;
+            padding: 14px;
+        }
+
+        .ecg-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .ecg-header h3 {
+            font-size: 0.9em;
+            color: #4ecdc4;
+        }
+
+        #ecg-canvas {
+            width: 100%;
+            height: 90px;
+            background: #030308;
+            border-radius: 8px;
+        }
+
+        /* Loading */
+        #loading-screen {
+            position: fixed;
+            inset: 0;
+            background: radial-gradient(ellipse at center, #1a0a2e 0%, #0a0a1a 70%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+            transition: opacity 0.5s;
+        }
+
+        #loading-screen.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .loading-heart {
+            font-size: 3.5em;
+            animation: heartbeat 1s ease-in-out infinite;
+        }
+
+        .loading-text {
+            margin-top: 14px;
+            font-size: 0.95em;
+            color: #666;
+        }
+
+        .loading-bar {
+            width: 160px;
+            height: 3px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 2px;
+            margin-top: 14px;
+            overflow: hidden;
+        }
+
+        .loading-progress {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            animation: loading 1.5s ease-out forwards;
+        }
+
+        @keyframes loading {
+            0% {
+                width: 0;
+            }
+
+            100% {
+                width: 100%;
+            }
+        }
+
+        @media (max-width: 1100px) {
+            #info-panel {
+                display: none;
+            }
+        }
+
+        @media (max-width: 700px) {
+            #main-panel {
+                width: calc(100% - 40px);
+                max-height: 260px;
+            }
+
+            #ecg-panel {
+                width: calc(100% - 40px);
+                left: 20px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div id="loading-screen">
+        <div class="loading-heart">❤️</div>
+        <div class="loading-text">Loading 3D Heart...</div>
+        <div class="loading-bar">
+            <div class="loading-progress"></div>
+        </div>
+    </div>
+    <div id="canvas-container"></div>
+
+    <div id="main-panel" class="panel">
+        <div class="panel-header">
+            <span class="heart-icon">❤️</span>
+            <h2>Cardiac Lab</h2>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card highlight">
+                <div class="stat-value bpm" id="heart-rate-value">72</div>
+                <div class="stat-label">BPM</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value co" id="cardiac-output">5.0</div>
+                <div class="stat-label">L/min CO</div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>Cardiac Cycle</h3>
+            <div class="timeline-bar">
+                <div class="timeline-progress" id="cycle-progress"></div>
+            </div>
+            <div class="current-phase">
+                <div class="phase-name" id="phase-name">Ventricular Diastole</div>
+                <div class="phase-desc" id="phase-desc">Ventricles filling with blood</div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>Valve Status</h3>
+            <div class="valve-grid">
+                <div class="valve-card closed" id="tricuspid-card">
+                    <div class="valve-header"><span class="valve-name">Tricuspid</span>
+                        <div class="valve-dot closed" id="tricuspid-dot"></div>
+                    </div>
+                    <div class="valve-type">Right AV • 3 cusps</div>
+                </div>
+                <div class="valve-card closed" id="mitral-card">
+                    <div class="valve-header"><span class="valve-name">Mitral</span>
+                        <div class="valve-dot closed" id="mitral-dot"></div>
+                    </div>
+                    <div class="valve-type">Left AV • 2 cusps</div>
+                </div>
+                <div class="valve-card closed" id="pulmonary-card">
+                    <div class="valve-header"><span class="valve-name">Pulmonary</span>
+                        <div class="valve-dot closed" id="pulmonary-dot"></div>
+                    </div>
+                    <div class="valve-type">Semilunar</div>
+                </div>
+                <div class="valve-card closed" id="aortic-card">
+                    <div class="valve-header"><span class="valve-name">Aortic</span>
+                        <div class="valve-dot closed" id="aortic-dot"></div>
+                    </div>
+                    <div class="valve-type">Semilunar</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>Controls</h3>
+            <div class="slider-control">
+                <div class="slider-header">
+                    <span class="slider-label">Heart Rate</span>
+                    <span class="slider-value"><span id="rate-display">72</span> BPM</span>
+                </div>
+                <input type="range" id="rate-slider" min="40" max="180" value="72">
+            </div>
+            <div class="btn-grid">
+                <button class="btn btn-primary" id="btn-pause"><span>⏸️</span> Pause</button>
+                <button class="btn btn-secondary" id="btn-reset"><span>🔄</span> Reset</button>
+                <button class="btn btn-secondary" id="btn-cutaway"><span>🔪</span> Cut</button>
+                <button class="btn btn-secondary" id="btn-xray"><span>☢️</span> X-Ray</button>
+                <button class="btn btn-secondary" id="btn-labels"><span>🏷️</span> Labels</button>
+                <button class="btn btn-secondary" id="btn-conduction"><span>⚡</span> Electrical</button>
+                <button class="btn btn-secondary btn-full" id="btn-flow"><span>🩸</span> Blood Flow</button>
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>Blood Flow Legend</h3>
+            <div class="legend-inline">
+                <div class="legend-item-inline">
+                    <div class="legend-dot oxy">O₂</div>
+                    <div class="legend-text-inline"><strong>Oxygenated</strong>Lungs→Body</div>
+                </div>
+                <div class="legend-item-inline">
+                    <div class="legend-dot deoxy">CO₂</div>
+                    <div class="legend-text-inline"><strong>Deoxygenated</strong>Body→Lungs</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="info-panel" class="panel">
+        <div class="info-header">
+            <div class="info-icon">📍</div>
+            <h3 id="info-title">Click a Structure</h3>
+        </div>
+        <div class="info-content" id="info-content">
+            <p>Interact with the 3D heart to learn about cardiac anatomy.</p>
+            <p><strong>Controls:</strong></p>
+            <ul style="margin-left: 14px; line-height: 1.7; font-size: 0.95em;">
+                <li>🖱️ <strong>Drag</strong> - Rotate</li>
+                <li>🔍 <strong>Scroll</strong> - Zoom</li>
+                <li>👆 <strong>Click</strong> - Select</li>
+            </ul>
+            <div class="fact-box">
+                <div class="fact-title">💡 Tip</div>
+                Enable "Labels" to see structure names!
+            </div>
+        </div>
+    </div>
+
+    <div id="ecg-panel" class="panel">
+        <div class="ecg-header">
+            <h3>📈 ECG Monitor</h3>
+            <span style="font-size: 0.7em; color: #555;">Lead II</span>
+        </div>
+        <canvas id="ecg-canvas" width="360" height="90"></canvas>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        window.addEventListener('load', () => setTimeout(() => document.getElementById('loading-screen').classList.add('hidden'), 700));
+
+        // === THREE.JS SETUP ===
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x0a0a1a);
+
+        const camera = new THREE.PerspectiveCamera(48, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 0.5, 11);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+        renderer.localClippingEnabled = true;
+        container.appendChild(renderer.domElement);
+
+        // === LIGHTING ===
+        scene.add(new THREE.AmbientLight(0x404060, 0.6));
+        const mainLight = new THREE.DirectionalLight(0xffffff, 1.1);
+        mainLight.position.set(5, 8, 6);
+        scene.add(mainLight);
+        scene.add(new THREE.DirectionalLight(0x6699ff, 0.35).translateX(-6).translateY(2));
+        scene.add(new THREE.PointLight(0xff4444, 0.4, 25).translateY(-6));
+        scene.add(new THREE.PointLight(0xffccaa, 0.25, 20).translateY(8));
+
+        // === HEART GROUP ===
+        const heartGroup = new THREE.Group();
+        scene.add(heartGroup);
+
+        const clipPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0.1);
+        const chambers = {}, vessels = {}, valves = {};
+
+        // === IMPROVED ANATOMICALLY ACCURATE HEART ===
+        // Using custom geometry for more realistic heart shape
+
+        function createHeartMaterial(color, roughness = 0.5) {
+            return new THREE.MeshPhysicalMaterial({
+                color, roughness, metalness: 0.02, clearcoat: 0.4, clearcoatRoughness: 0.3,
+                transparent: true, opacity: 0.92, side: THREE.DoubleSide
+            });
+        }
+
+        // Create anatomically correct chambers with proper positioning and shape
+        // Right Atrium - posterior-right, receives venous blood
+        const raGeo = new THREE.SphereGeometry(1, 48, 48);
+        raGeo.scale(0.75, 0.7, 0.6);
+        chambers.rightAtrium = new THREE.Mesh(raGeo, createHeartMaterial(0x4466bb));
+        chambers.rightAtrium.position.set(1.1, 1.1, 0.15);
+        chambers.rightAtrium.userData = { name: 'Right Atrium', type: 'chamber' };
+        heartGroup.add(chambers.rightAtrium);
+
+        // Right Ventricle - anterior-right, crescent shape wrapping around LV
+        const rvGeo = new THREE.SphereGeometry(1, 48, 48);
+        rvGeo.scale(0.85, 1.25, 0.7);
+        chambers.rightVentricle = new THREE.Mesh(rvGeo, createHeartMaterial(0x3355aa));
+        chambers.rightVentricle.position.set(0.7, -0.35, 0.4);
+        chambers.rightVentricle.rotation.z = 0.2;
+        chambers.rightVentricle.userData = { name: 'Right Ventricle', type: 'chamber' };
+        heartGroup.add(chambers.rightVentricle);
+
+        // Left Atrium - posterior-left, receives pulmonary veins
+        const laGeo = new THREE.SphereGeometry(1, 48, 48);
+        laGeo.scale(0.7, 0.65, 0.6);
+        chambers.leftAtrium = new THREE.Mesh(laGeo, createHeartMaterial(0xbb4455));
+        chambers.leftAtrium.position.set(-0.75, 1.15, -0.3);
+        chambers.leftAtrium.userData = { name: 'Left Atrium', type: 'chamber' };
+        heartGroup.add(chambers.leftAtrium);
+
+        // Left Ventricle - posterior-left, thick-walled, conical shape (apex points down-left)
+        const lvGeo = new THREE.SphereGeometry(1, 48, 48);
+        lvGeo.scale(0.85, 1.45, 0.8);
+        chambers.leftVentricle = new THREE.Mesh(lvGeo, createHeartMaterial(0xaa3344));
+        chambers.leftVentricle.position.set(-0.4, -0.5, -0.05);
+        chambers.leftVentricle.rotation.z = -0.15;
+        chambers.leftVentricle.userData = { name: 'Left Ventricle', type: 'chamber' };
+        heartGroup.add(chambers.leftVentricle);
+
+        // Create apex point (bottom tip of heart)
+        const apexGeo = new THREE.ConeGeometry(0.5, 0.8, 24);
+        const apex = new THREE.Mesh(apexGeo, createHeartMaterial(0x993344));
+        apex.position.set(0.1, -1.9, 0.15);
+        apex.rotation.x = Math.PI;
+        apex.rotation.z = 0.1;
+        apex.userData = { name: 'Cardiac Apex', type: 'structure' };
+        heartGroup.add(apex);
+
+        // Interventricular Septum - thicker, angled
+        const septumGeo = new THREE.BoxGeometry(0.18, 2.2, 1.2);
+        const septum = new THREE.Mesh(septumGeo, createHeartMaterial(0x775566, 0.55));
+        septum.position.set(0.15, 0.0, 0.12);
+        septum.rotation.z = 0.05;
+        septum.userData = { name: 'Interventricular Septum', type: 'structure' };
+        heartGroup.add(septum);
+
+        // Interatrial Septum
+        const iasSeptum = new THREE.Mesh(
+            new THREE.BoxGeometry(0.1, 0.9, 0.8),
+            createHeartMaterial(0x665577, 0.55)
+        );
+        iasSeptum.position.set(0.18, 1.1, -0.05);
+        iasSeptum.userData = { name: 'Interatrial Septum', type: 'structure' };
+        heartGroup.add(iasSeptum);
+
+        // === BLOOD VESSELS - More anatomical accuracy ===
+        function createVessel(path, radius, color, name) {
+            const curve = new THREE.CatmullRomCurve3(path);
+            const geo = new THREE.TubeGeometry(curve, 48, radius, 14, false);
+            const mat = new THREE.MeshPhysicalMaterial({
+                color, roughness: 0.4, transparent: true, opacity: 0.88, side: THREE.DoubleSide
+            });
+            const mesh = new THREE.Mesh(geo, mat);
+            mesh.userData = { name, type: 'vessel' };
+            mesh.castShadow = true;
+            return { mesh, curve };
+        }
+
+        // Aorta - ascending, arch, and descending
+        vessels.aorta = createVessel([
+            new THREE.Vector3(-0.25, 1.4, -0.05),
+            new THREE.Vector3(-0.2, 2.1, 0),
+            new THREE.Vector3(-0.05, 2.65, -0.1),
+            new THREE.Vector3(0.5, 2.95, -0.35),
+            new THREE.Vector3(1.2, 2.9, -0.6),
+            new THREE.Vector3(1.7, 2.5, -0.85),
+            new THREE.Vector3(1.9, 1.8, -1.0)
+        ], 0.38, 0xcc3333, 'Aorta');
+        heartGroup.add(vessels.aorta.mesh);
+
+        // Pulmonary Trunk - exits RV, bifurcates
+        vessels.pulmonaryArtery = createVessel([
+            new THREE.Vector3(0.45, 1.0, 0.45),
+            new THREE.Vector3(0.3, 1.6, 0.55),
+            new THREE.Vector3(-0.1, 2.15, 0.7),
+            new THREE.Vector3(-0.7, 2.5, 0.85),
+            new THREE.Vector3(-1.3, 2.7, 0.95)
+        ], 0.3, 0x3355cc, 'Pulmonary Trunk');
+        heartGroup.add(vessels.pulmonaryArtery.mesh);
+
+        // Superior Vena Cava
+        vessels.svc = createVessel([
+            new THREE.Vector3(1.4, 3.3, 0.15),
+            new THREE.Vector3(1.3, 2.4, 0.15),
+            new THREE.Vector3(1.2, 1.6, 0.15)
+        ], 0.26, 0x3366aa, 'Superior Vena Cava');
+        heartGroup.add(vessels.svc.mesh);
+
+        // Inferior Vena Cava
+        vessels.ivc = createVessel([
+            new THREE.Vector3(1.25, -1.8, 0.25),
+            new THREE.Vector3(1.2, -0.8, 0.2),
+            new THREE.Vector3(1.15, 0.3, 0.17)
+        ], 0.28, 0x3366aa, 'Inferior Vena Cava');
+        heartGroup.add(vessels.ivc.mesh);
+
+        // Pulmonary Veins (4 - 2 shown for clarity)
+        const pvColor = 0xcc4455;
+        vessels.pv1 = createVessel([
+            new THREE.Vector3(-1.8, 1.7, -0.35), new THREE.Vector3(-1.2, 1.45, -0.28), new THREE.Vector3(-0.85, 1.25, -0.25)
+        ], 0.14, pvColor, 'Pulmonary Vein');
+        vessels.pv2 = createVessel([
+            new THREE.Vector3(-1.7, 1.1, -0.45), new THREE.Vector3(-1.15, 1.15, -0.32), new THREE.Vector3(-0.8, 1.15, -0.28)
+        ], 0.14, pvColor, 'Pulmonary Vein');
+        heartGroup.add(vessels.pv1.mesh, vessels.pv2.mesh);
+
+        // === VALVES ===
+        function createValve(pos, leaflets, color, name) {
+            const g = new THREE.Group();
+            g.userData = { name, type: 'valve' };
+            g.leaflets = [];
+
+            for (let i = 0; i < leaflets; i++) {
+                const shape = new THREE.Shape();
+                shape.moveTo(0, 0);
+                shape.quadraticCurveTo(0.1, 0.15, 0, 0.25);
+                shape.quadraticCurveTo(-0.1, 0.15, 0, 0);
+
+                const leaflet = new THREE.Mesh(
+                    new THREE.ShapeGeometry(shape),
+                    new THREE.MeshPhysicalMaterial({ color, roughness: 0.3, transparent: true, opacity: 0.85, side: THREE.DoubleSide })
+                );
+                leaflet.rotation.y = (i * Math.PI * 2) / leaflets;
+                leaflet.rotation.x = Math.PI / 2;
+                g.leaflets.push(leaflet);
+                g.add(leaflet);
+            }
+
+            const ring = new THREE.Mesh(
+                new THREE.TorusGeometry(0.22, 0.03, 10, 24),
+                new THREE.MeshPhysicalMaterial({ color: 0xeedddd, roughness: 0.4 })
+            );
+            ring.rotation.x = Math.PI / 2;
+            g.add(ring);
+            g.position.set(...pos);
+            return g;
+        }
+
+        valves.tricuspid = { mesh: createValve([0.9, 0.35, 0.25], 3, 0xffcccc, 'Tricuspid Valve'), open: false };
+        valves.mitral = { mesh: createValve([-0.55, 0.4, -0.12], 2, 0xffcccc, 'Mitral Valve'), open: false };
+        valves.pulmonary = { mesh: createValve([0.45, 1.05, 0.48], 3, 0xccccff, 'Pulmonary Valve'), open: false };
+        valves.aortic = { mesh: createValve([-0.25, 1.3, -0.02], 3, 0xffdddd, 'Aortic Valve'), open: false };
+
+        valves.tricuspid.mesh.rotation.x = 0.25;
+        valves.mitral.mesh.rotation.x = 0.25;
+        valves.pulmonary.mesh.rotation.x = -0.45;
+        valves.pulmonary.mesh.scale.setScalar(0.82);
+        valves.aortic.mesh.rotation.x = -0.25;
+        valves.aortic.mesh.scale.setScalar(0.88);
+
+        Object.values(valves).forEach(v => heartGroup.add(v.mesh));
+
+        // === CONDUCTION SYSTEM ===
+        const conductionGroup = new THREE.Group();
+        conductionGroup.visible = false;
+        heartGroup.add(conductionGroup);
+
+        const saNode = new THREE.Mesh(
+            new THREE.SphereGeometry(0.1, 16, 16),
+            new THREE.MeshPhongMaterial({ color: 0xffff00, emissive: 0x888800, transparent: true, opacity: 0.9 })
+        );
+        saNode.position.set(1.35, 1.45, 0.35);
+        saNode.userData = { name: 'SA Node (Pacemaker)', type: 'conduction' };
+        conductionGroup.add(saNode);
+
+        const avNode = new THREE.Mesh(
+            new THREE.SphereGeometry(0.08, 16, 16),
+            new THREE.MeshPhongMaterial({ color: 0xff8800, emissive: 0x884400, transparent: true, opacity: 0.9 })
+        );
+        avNode.position.set(0.22, 0.5, 0.2);
+        avNode.userData = { name: 'AV Node', type: 'conduction' };
+        conductionGroup.add(avNode);
+
+        const bundleHis = new THREE.Mesh(
+            new THREE.TubeGeometry(new THREE.CatmullRomCurve3([
+                new THREE.Vector3(0.22, 0.42, 0.18),
+                new THREE.Vector3(0.15, 0.05, 0.12),
+                new THREE.Vector3(0.12, -0.35, 0.08)
+            ]), 16, 0.025, 8, false),
+            new THREE.MeshPhongMaterial({ color: 0xff4400, emissive: 0x662200 })
+        );
+        bundleHis.userData = { name: 'Bundle of His', type: 'conduction' };
+        conductionGroup.add(bundleHis);
+
+        // === BLOOD PARTICLES ===
+        const bloodParticles = [];
+        let showBloodFlow = true;
+
+        class BloodParticle {
+            constructor(oxy, path, speed) {
+                const geo = new THREE.SphereGeometry(0.045, 8, 8);
+                const mat = new THREE.MeshPhongMaterial({
+                    color: oxy ? 0xff2222 : 0x2244ff,
+                    emissive: oxy ? 0x550000 : 0x000044,
+                    transparent: true, opacity: 0.92
+                });
+                this.mesh = new THREE.Mesh(geo, mat);
+                this.path = path;
+                this.progress = Math.random();
+                this.speed = speed + Math.random() * 0.06;
+                this.oxy = oxy;
+                heartGroup.add(this.mesh);
+            }
+            update(dt, mult = 1) {
+                this.progress += dt * this.speed * mult;
+                if (this.progress > 1) this.progress = 0;
+                this.mesh.position.copy(this.path.getPoint(this.progress));
+                this.mesh.scale.setScalar(1 + Math.sin(Date.now() * 0.007 + this.progress * 8) * 0.1);
+            }
+            setVisible(v) { this.mesh.visible = v; }
+        }
+
+        const bloodPaths = {
+            svcToRA: new THREE.CatmullRomCurve3([new THREE.Vector3(1.35, 3.1, 0.15), new THREE.Vector3(1.25, 2.2, 0.15), new THREE.Vector3(1.15, 1.2, 0.15)]),
+            raToRV: new THREE.CatmullRomCurve3([new THREE.Vector3(1.1, 1.1, 0.15), new THREE.Vector3(0.95, 0.65, 0.2), new THREE.Vector3(0.8, 0.2, 0.28), new THREE.Vector3(0.7, -0.3, 0.38)]),
+            rvToPA: new THREE.CatmullRomCurve3([new THREE.Vector3(0.7, -0.3, 0.4), new THREE.Vector3(0.55, 0.25, 0.45), new THREE.Vector3(0.45, 0.8, 0.5), new THREE.Vector3(0.15, 1.5, 0.6), new THREE.Vector3(-0.5, 2.1, 0.78)]),
+            pvToLA: new THREE.CatmullRomCurve3([new THREE.Vector3(-1.6, 1.5, -0.35), new THREE.Vector3(-1.15, 1.35, -0.28), new THREE.Vector3(-0.8, 1.2, -0.25)]),
+            laToLV: new THREE.CatmullRomCurve3([new THREE.Vector3(-0.78, 1.15, -0.25), new THREE.Vector3(-0.65, 0.75, -0.15), new THREE.Vector3(-0.52, 0.3, -0.05), new THREE.Vector3(-0.42, -0.4, 0)]),
+            lvToAorta: new THREE.CatmullRomCurve3([new THREE.Vector3(-0.42, -0.4, 0), new THREE.Vector3(-0.35, 0.25, 0), new THREE.Vector3(-0.28, 0.9, -0.02), new THREE.Vector3(-0.22, 1.7, 0), new THREE.Vector3(0.15, 2.5, -0.2), new THREE.Vector3(1.0, 2.8, -0.55)])
+        };
+
+        [
+            { path: bloodPaths.svcToRA, oxy: false, count: 8, speed: 0.2 },
+            { path: bloodPaths.raToRV, oxy: false, count: 10, speed: 0.28 },
+            { path: bloodPaths.rvToPA, oxy: false, count: 10, speed: 0.26 },
+            { path: bloodPaths.pvToLA, oxy: true, count: 8, speed: 0.2 },
+            { path: bloodPaths.laToLV, oxy: true, count: 10, speed: 0.28 },
+            { path: bloodPaths.lvToAorta, oxy: true, count: 10, speed: 0.26 }
+        ].forEach(cfg => {
+            for (let i = 0; i < cfg.count; i++) bloodParticles.push(new BloodParticle(cfg.oxy, cfg.path, cfg.speed));
+        });
+
+        // === LABELS ===
+        const labelSprites = [];
+        let showLabels = false;
+
+        function createLabel(text, pos, scale = 1) {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = 320; canvas.height = 60;
+            ctx.fillStyle = 'rgba(10, 10, 30, 0.88)';
+            ctx.fillRect(0, 0, 320, 60);
+            ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(0, 0, 320, 60);
+            ctx.font = 'bold 22px Segoe UI';
+            ctx.fillStyle = '#fff';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(text, 160, 30);
+
+            const tex = new THREE.CanvasTexture(canvas);
+            const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false }));
+            sprite.position.set(...pos);
+            sprite.scale.set(1.5 * scale, 0.28 * scale, 1);
+            sprite.visible = false;
+            sprite.renderOrder = 999;
+            heartGroup.add(sprite);
+            labelSprites.push(sprite);
+        }
+
+        createLabel('Right Atrium', [1.8, 1.15, 0.5]);
+        createLabel('Right Ventricle', [1.5, -0.4, 0.75]);
+        createLabel('Left Atrium', [-1.4, 1.2, 0.25]);
+        createLabel('Left Ventricle', [-1.2, -0.55, 0.45]);
+        createLabel('Aorta', [0.6, 3.1, 0.15], 0.85);
+        createLabel('Pulmonary Trunk', [-0.7, 2.65, 0.95], 0.8);
+        createLabel('SVC', [1.9, 2.8, 0.3], 0.7);
+        createLabel('IVC', [1.7, -1.4, 0.4], 0.7);
+
+        // === CARDIAC CYCLE ===
+        let heartRate = 72, cycleTime = 0, isPaused = false, lastTime = performance.now();
+
+        const phaseInfo = {
+            'Atrial Systole': 'Atria contract, pushing blood into ventricles',
+            'Isovolumetric Contraction': 'All valves closed, pressure builds rapidly',
+            'Ventricular Ejection': 'Blood ejected to aorta and pulmonary trunk',
+            'Isovolumetric Relaxation': 'All valves closed, pressure drops',
+            'Rapid Filling': 'AV valves open, blood rushes into ventricles',
+            'Diastasis': 'Slow passive ventricular filling'
+        };
+
+        function updateCardiacCycle(dt) {
+            if (isPaused) return;
+
+            const cycleDur = 60 / heartRate;
+            cycleTime += dt / cycleDur;
+            if (cycleTime > 1) cycleTime -= 1;
+
+            const phase = cycleTime;
+            document.getElementById('cycle-progress').style.width = (phase * 100) + '%';
+
+            let phaseName, avOpen = false, slOpen = false;
+
+            if (phase < 0.1) { phaseName = 'Atrial Systole'; avOpen = true; }
+            else if (phase < 0.15) { phaseName = 'Isovolumetric Contraction'; }
+            else if (phase < 0.4) { phaseName = 'Ventricular Ejection'; slOpen = true; }
+            else if (phase < 0.45) { phaseName = 'Isovolumetric Relaxation'; }
+            else if (phase < 0.6) { phaseName = 'Rapid Filling'; avOpen = true; }
+            else { phaseName = 'Diastasis'; avOpen = true; }
+
+            document.getElementById('phase-name').textContent = phaseName;
+            document.getElementById('phase-desc').textContent = phaseInfo[phaseName] || '';
+
+            updateValve('tricuspid', avOpen);
+            updateValve('mitral', avOpen);
+            updateValve('pulmonary', slOpen);
+            updateValve('aortic', slOpen);
+
+            Object.keys(valves).forEach(k => {
+                const v = valves[k];
+                const target = v.open ? -Math.PI / 2.5 : 0;
+                v.mesh.leaflets?.forEach(l => l.rotation.z += (target - l.rotation.z) * 0.16);
+            });
+
+            // Heart animation - more pronounced
+            const atrialC = phase < 0.1 ? Math.sin(phase * 10 * Math.PI) * 0.08 : 0;
+            let ventC = 0;
+            if (phase >= 0.1 && phase < 0.4) ventC = Math.sin((phase - 0.1) / 0.3 * Math.PI) * 0.12;
+
+            chambers.rightAtrium.scale.setScalar(1 - atrialC);
+            chambers.leftAtrium.scale.setScalar(1 - atrialC);
+            chambers.rightVentricle.scale.set(1 - ventC * 0.75, 1 - ventC * 0.45, 1 - ventC * 0.75);
+            chambers.leftVentricle.scale.set(1 - ventC * 0.85, 1 - ventC * 0.4, 1 - ventC * 0.85);
+            apex.scale.setScalar(1 - ventC * 0.5);
+
+            // Subtle heart movement
+            heartGroup.position.y = Math.sin(phase * Math.PI * 2) * 0.015;
+
+            bloodParticles.forEach(p => p.update(dt, heartRate / 72));
+
+            if (conductionGroup.visible) {
+                const saGlow = phase < 0.05 ? Math.sin(phase * 20 * Math.PI) : 0;
+                saNode.scale.setScalar(1 + saGlow * 0.22);
+                const avGlow = ((phase - 0.03 + 1) % 1) < 0.05 ? Math.sin(((phase - 0.03 + 1) % 1) * 20 * Math.PI) : 0;
+                avNode.scale.setScalar(1 + avGlow * 0.22);
+            }
+        }
+
+        function updateValve(name, isOpen) {
+            valves[name].open = isOpen;
+            const dot = document.getElementById(`${name}-dot`);
+            const card = document.getElementById(`${name}-card`);
+            dot.className = `valve-dot ${isOpen ? 'open' : 'closed'}`;
+            card.className = `valve-card ${isOpen ? 'open' : 'closed'}`;
+        }
+
+        // === ECG ===
+        const ecgCanvas = document.getElementById('ecg-canvas');
+        const ecgCtx = ecgCanvas.getContext('2d');
+        let ecgData = [], ecgX = 0;
+        const ECG_W = 360, ECG_H = 90;
+
+        function genECG(p) {
+            let y = ECG_H / 2;
+            const base = ECG_H / 2, amp = ECG_H * 0.38;
+            if (p < 0.08) y = base - Math.sin(p / 0.08 * Math.PI) * amp * 0.2;
+            else if (p < 0.12) y = base;
+            else if (p < 0.14) y = base + Math.sin((p - 0.12) / 0.02 * Math.PI) * amp * 0.1;
+            else if (p < 0.18) y = base - Math.sin((p - 0.14) / 0.04 * Math.PI) * amp * 0.92;
+            else if (p < 0.21) y = base + Math.sin((p - 0.18) / 0.03 * Math.PI) * amp * 0.22;
+            else if (p < 0.30) y = base;
+            else if (p < 0.42) y = base - Math.sin((p - 0.30) / 0.12 * Math.PI) * amp * 0.3;
+            return y + (Math.random() - 0.5) * 1;
+        }
+
+        function renderECG() {
+            ecgCtx.fillStyle = 'rgba(3, 3, 8, 0.1)';
+            ecgCtx.fillRect(0, 0, ECG_W, ECG_H);
+            ecgCtx.strokeStyle = 'rgba(0, 70, 0, 0.12)';
+            ecgCtx.lineWidth = 0.5;
+            for (let x = 0; x < ECG_W; x += 18) { ecgCtx.beginPath(); ecgCtx.moveTo(x, 0); ecgCtx.lineTo(x, ECG_H); ecgCtx.stroke(); }
+            for (let y = 0; y < ECG_H; y += 18) { ecgCtx.beginPath(); ecgCtx.moveTo(0, y); ecgCtx.lineTo(ECG_W, y); ecgCtx.stroke(); }
+            if (ecgData.length > 1) {
+                ecgCtx.beginPath();
+                ecgCtx.strokeStyle = '#00ff00';
+                ecgCtx.lineWidth = 1.6;
+                ecgCtx.shadowColor = '#00ff00';
+                ecgCtx.shadowBlur = 6;
+                ecgData.forEach((pt, i) => i === 0 ? ecgCtx.moveTo(pt.x, pt.y) : ecgCtx.lineTo(pt.x, pt.y));
+                ecgCtx.stroke();
+                ecgCtx.shadowBlur = 0;
+            }
+            ecgCtx.fillStyle = 'rgba(0, 255, 0, 0.65)';
+            ecgCtx.fillRect(ecgX, 0, 2, ECG_H);
+        }
+
+        function updateECG() {
+            ecgData.push({ x: ecgX, y: genECG(cycleTime) });
+            ecgX += 1.6;
+            if (ecgX >= ECG_W) { ecgX = 0; ecgData = []; }
+            ecgData = ecgData.filter(pt => pt.x >= ecgX - ECG_W);
+            renderECG();
+        }
+
+        // === INTERACTION ===
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+        let isDragging = false, prevMouse = { x: 0, y: 0 }, autoRotate = true;
+
+        container.addEventListener('mousedown', e => {
+            if (e.target.closest('.panel')) return;
+            isDragging = true; autoRotate = false;
+            prevMouse = { x: e.clientX, y: e.clientY };
+        });
+        container.addEventListener('mousemove', e => {
+            if (!isDragging) return;
+            heartGroup.rotation.y += (e.clientX - prevMouse.x) * 0.006;
+            heartGroup.rotation.x += (e.clientY - prevMouse.y) * 0.006;
+            heartGroup.rotation.x = Math.max(-Math.PI / 3, Math.min(Math.PI / 3, heartGroup.rotation.x));
+            prevMouse = { x: e.clientX, y: e.clientY };
+        });
+        window.addEventListener('mouseup', () => isDragging = false);
+        container.addEventListener('wheel', e => {
+            e.preventDefault();
+            camera.position.z += e.deltaY * 0.007;
+            camera.position.z = Math.max(6, Math.min(18, camera.position.z));
+        }, { passive: false });
+
+        container.addEventListener('click', e => {
+            if (e.target.closest('.panel') || isDragging) return;
+            mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+            raycaster.setFromCamera(mouse, camera);
+            const hits = raycaster.intersectObjects(heartGroup.children, true);
+            const hit = hits.find(h => h.object.userData.name || (h.object.parent && h.object.parent.userData.name));
+            if (hit) selectObject(hit.object.userData.name ? hit.object : hit.object.parent);
+        });
+
+        let selectedObj = null;
+        function selectObject(obj) {
+            if (selectedObj?.material?.emissive) selectedObj.material.emissive.setHex(0);
+            selectedObj = obj;
+            if (obj.material?.emissive) obj.material.emissive.setHex(0x333366);
+            document.getElementById('info-title').textContent = obj.userData.name || 'Unknown';
+            document.getElementById('info-content').innerHTML = getInfo(obj.userData.name);
+        }
+
+        function getInfo(name) {
+            const infos = {
+                'Right Atrium': `<p>Receives <strong>deoxygenated blood</strong> from the body via SVC & IVC.</p><div class="fact-box"><div class="fact-title">Facts</div>Wall: 2mm • Pressure: 2-8 mmHg • Contains SA Node</div>`,
+                'Right Ventricle': `<p>Pumps blood to the <strong>lungs</strong> via the Pulmonary Trunk.</p><div class="fact-box"><div class="fact-title">Facts</div>Wall: 3-5mm • Pressure: 15-30 mmHg</div>`,
+                'Left Atrium': `<p>Receives <strong>oxygenated blood</strong> from lungs via Pulmonary Veins.</p><div class="fact-box"><div class="fact-title">Facts</div>Wall: 3mm • Smallest chamber</div>`,
+                'Left Ventricle': `<p>The <strong>strongest chamber</strong> - pumps blood to entire body.</p><div class="fact-box"><div class="fact-title">Facts</div>Wall: 10-15mm • Pressure: up to 120 mmHg</div>`,
+                'Aorta': `<p>Largest artery - distributes oxygenated blood systemically.</p><div class="fact-box"><div class="fact-title">Facts</div>Diameter: 2.5-3.5cm • Pressure: 80-120 mmHg</div>`,
+                'Cardiac Apex': `<p>The pointed bottom of the heart, formed mainly by the left ventricle. Points down and to the left.</p>`,
+                'Interventricular Septum': `<p>Muscular wall separating left and right ventricles. Contains bundle branches.</p>`,
+                'Tricuspid Valve': `<p>Right AV valve with <strong>3 leaflets</strong>. Prevents backflow to RA during systole.</p>`,
+                'Mitral Valve': `<p>Left AV valve with <strong>2 leaflets</strong>. Named for resemblance to a bishop's mitre.</p>`,
+                'Pulmonary Valve': `<p>Semilunar valve preventing backflow from pulmonary trunk.</p>`,
+                'Aortic Valve': `<p>Semilunar valve at aortic root. Withstands the highest pressures.</p>`,
+                'SA Node (Pacemaker)': `<p>The heart's natural <strong>pacemaker</strong> - generates 60-100 impulses/min.</p>`,
+                'AV Node': `<p>Delays signal ~0.1s for atrial emptying before ventricular contraction.</p>`
+            };
+            return infos[name] || `<p>Click structures to learn more about cardiac anatomy.</p>`;
+        }
+
+        // === CONTROLS ===
+        const rateSlider = document.getElementById('rate-slider');
+        rateSlider.addEventListener('input', () => {
+            heartRate = parseInt(rateSlider.value);
+            document.getElementById('rate-display').textContent = heartRate;
+            document.getElementById('heart-rate-value').textContent = heartRate;
+            document.getElementById('cardiac-output').textContent = (heartRate * 70 / 1000).toFixed(1);
+        });
+
+        const btnPause = document.getElementById('btn-pause');
+        btnPause.addEventListener('click', () => {
+            isPaused = !isPaused;
+            btnPause.innerHTML = isPaused ? '<span>▶️</span> Play' : '<span>⏸️</span> Pause';
+            btnPause.classList.toggle('active', isPaused);
+        });
+
+        document.getElementById('btn-reset').addEventListener('click', () => {
+            heartRate = 72; rateSlider.value = 72;
+            document.getElementById('rate-display').textContent = 72;
+            document.getElementById('heart-rate-value').textContent = 72;
+            document.getElementById('cardiac-output').textContent = '5.0';
+            cycleTime = 0; isPaused = false;
+            btnPause.innerHTML = '<span>⏸️</span> Pause';
+            btnPause.classList.remove('active');
+            heartGroup.rotation.set(0, 0, 0);
+            camera.position.set(0, 0.5, 11);
+            autoRotate = true;
+        });
+
+        let cutaway = false;
+        document.getElementById('btn-cutaway').addEventListener('click', () => {
+            cutaway = !cutaway;
+            document.getElementById('btn-cutaway').classList.toggle('active', cutaway);
+            heartGroup.traverse(o => { if (o.isMesh && o.material) o.material.clippingPlanes = cutaway ? [clipPlane] : []; });
+        });
+
+        let xray = false;
+        document.getElementById('btn-xray').addEventListener('click', () => {
+            xray = !xray;
+            document.getElementById('btn-xray').classList.toggle('active', xray);
+            heartGroup.traverse(o => {
+                if (o.isMesh && o.material) {
+                    o.material.opacity = xray ? 0.22 : 0.92;
+                    o.material.wireframe = xray;
+                }
+            });
+        });
+
+        document.getElementById('btn-labels').addEventListener('click', () => {
+            showLabels = !showLabels;
+            document.getElementById('btn-labels').classList.toggle('active', showLabels);
+            labelSprites.forEach(s => s.visible = showLabels);
+        });
+
+        document.getElementById('btn-conduction').addEventListener('click', () => {
+            conductionGroup.visible = !conductionGroup.visible;
+            document.getElementById('btn-conduction').classList.toggle('active', conductionGroup.visible);
+        });
+
+        document.getElementById('btn-flow').addEventListener('click', () => {
+            showBloodFlow = !showBloodFlow;
+            document.getElementById('btn-flow').classList.toggle('active', !showBloodFlow);
+            bloodParticles.forEach(p => p.setVisible(showBloodFlow));
+        });
+
+        // === ANIMATION ===
+        function animate() {
+            requestAnimationFrame(animate);
+            const now = performance.now();
+            const dt = (now - lastTime) / 1000;
+            lastTime = now;
+            if (autoRotate && !isDragging) heartGroup.rotation.y += 0.0018;
+            updateCardiacCycle(dt);
+            if (!isPaused) updateECG();
+            labelSprites.forEach(s => s.quaternion.copy(camera.quaternion));
+            renderer.render(scene, camera);
+        }
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        animate();
+    </script>
+</body>
+
+</html>
