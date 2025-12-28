@@ -1,0 +1,1202 @@
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Heart Simulation - Complete Cardiac Cycle</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #0a0a1a 0%, #1a0a2e 100%);
+            overflow: hidden;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+        }
+        
+        #info-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.85);
+            color: #fff;
+            padding: 20px;
+            border-radius: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            min-width: 280px;
+        }
+        
+        #info-panel h2 {
+            color: #ff6b6b;
+            margin-bottom: 15px;
+            font-size: 1.4em;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .heart-icon {
+            animation: pulse 1s ease-in-out infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.2); }
+        }
+        
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .stat-label {
+            color: #aaa;
+        }
+        
+        .stat-value {
+            font-weight: bold;
+            color: #fff;
+        }
+        
+        .stat-value.systole {
+            color: #ff6b6b;
+        }
+        
+        .stat-value.diastole {
+            color: #4ecdc4;
+        }
+        
+        #controls-panel {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.85);
+            color: #fff;
+            padding: 20px;
+            border-radius: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+        }
+        
+        .control-group {
+            margin-bottom: 15px;
+        }
+        
+        .control-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #aaa;
+        }
+        
+        input[type="range"] {
+            width: 200px;
+            height: 6px;
+            -webkit-appearance: none;
+            background: linear-gradient(90deg, #4ecdc4, #ff6b6b);
+            border-radius: 3px;
+            outline: none;
+        }
+        
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            background: #fff;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+        }
+        
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-right: 10px;
+            margin-top: 5px;
+            font-size: 14px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn.active {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+        
+        #legend {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.85);
+            color: #fff;
+            padding: 20px;
+            border-radius: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin: 8px 0;
+        }
+        
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            margin-right: 10px;
+        }
+        
+        .oxygenated { background: #ff3333; box-shadow: 0 0 10px #ff3333; }
+        .deoxygenated { background: #3333ff; box-shadow: 0 0 10px #3333ff; }
+        
+        #ecg-container {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.85);
+            padding: 15px;
+            border-radius: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        #ecg-canvas {
+            background: #0a0a0a;
+            border-radius: 8px;
+        }
+        
+        .valve-status {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        
+        .valve-indicator {
+            padding: 8px;
+            border-radius: 8px;
+            text-align: center;
+            font-size: 12px;
+            transition: all 0.3s;
+        }
+        
+        .valve-open {
+            background: rgba(78, 205, 196, 0.3);
+            border: 1px solid #4ecdc4;
+            color: #4ecdc4;
+        }
+        
+        .valve-closed {
+            background: rgba(255, 107, 107, 0.3);
+            border: 1px solid #ff6b6b;
+            color: #ff6b6b;
+        }
+    </style>
+</head>
+<body>
+    <div id="canvas-container"></div>
+    
+    <div id="info-panel">
+        <h2><span class="heart-icon">❤️</span> Cardiac Monitor</h2>
+        <div class="stat-row">
+            <span class="stat-label">Heart Rate</span>
+            <span class="stat-value" id="heart-rate">72 BPM</span>
+        </div>
+        <div class="stat-row">
+            <span class="stat-label">Phase</span>
+            <span class="stat-value" id="cardiac-phase">Diastole</span>
+        </div>
+        <div class="stat-row">
+            <span class="stat-label">Cardiac Output</span>
+            <span class="stat-value" id="cardiac-output">5.0 L/min</span>
+        </div>
+        <div class="stat-row">
+            <span class="stat-label">Stroke Volume</span>
+            <span class="stat-value" id="stroke-volume">70 mL</span>
+        </div>
+        
+        <h3 style="margin-top: 15px; margin-bottom: 10px; font-size: 1em; color: #aaa;">Valve Status</h3>
+        <div class="valve-status">
+            <div class="valve-indicator valve-closed" id="tricuspid-status">Tricuspid</div>
+            <div class="valve-indicator valve-closed" id="mitral-status">Mitral</div>
+            <div class="valve-indicator valve-closed" id="pulmonary-status">Pulmonary</div>
+            <div class="valve-indicator valve-closed" id="aortic-status">Aortic</div>
+        </div>
+    </div>
+    
+    <div id="controls-panel">
+        <div class="control-group">
+            <label>Heart Rate: <span id="rate-display">72</span> BPM</label>
+            <input type="range" id="rate-slider" min="40" max="180" value="72">
+        </div>
+        <div class="control-group">
+            <label>View Controls</label>
+            <button class="btn" id="btn-cutaway">Cross Section</button>
+            <button class="btn" id="btn-xray">X-Ray View</button>
+            <button class="btn" id="btn-pause">Pause</button>
+        </div>
+        <div class="control-group">
+            <button class="btn" id="btn-labels">Toggle Labels</button>
+            <button class="btn" id="btn-reset">Reset View</button>
+        </div>
+    </div>
+    
+    <div id="legend">
+        <h3 style="margin-bottom: 15px;">Blood Flow Legend</h3>
+        <div class="legend-item">
+            <div class="legend-color oxygenated"></div>
+            <span>Oxygenated Blood (O₂)</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color deoxygenated"></div>
+            <span>Deoxygenated Blood (CO₂)</span>
+        </div>
+    </div>
+    
+    <div id="ecg-container">
+        <canvas id="ecg-canvas" width="300" height="100"></canvas>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // ==================== THREE.JS SETUP ====================
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x0a0a1a);
+        scene.fog = new THREE.Fog(0x0a0a1a, 10, 50);
+        
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 0, 8);
+        
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        container.appendChild(renderer.domElement);
+        
+        // ==================== LIGHTING ====================
+        const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
+        scene.add(ambientLight);
+        
+        const mainLight = new THREE.DirectionalLight(0xffffff, 1);
+        mainLight.position.set(5, 5, 5);
+        mainLight.castShadow = true;
+        scene.add(mainLight);
+        
+        const fillLight = new THREE.DirectionalLight(0x6699ff, 0.3);
+        fillLight.position.set(-5, 0, -5);
+        scene.add(fillLight);
+        
+        const rimLight = new THREE.DirectionalLight(0xff6666, 0.4);
+        rimLight.position.set(0, -5, 0);
+        scene.add(rimLight);
+        
+        // ==================== MATERIALS ====================
+        const heartMaterial = new THREE.MeshPhysicalMaterial({
+            color: 0xcc4444,
+            roughness: 0.6,
+            metalness: 0.1,
+            clearcoat: 0.3,
+            clearcoatRoughness: 0.4,
+            transparent: true,
+            opacity: 0.95,
+            side: THREE.DoubleSide
+        });
+        
+        const oxygenatedBloodMaterial = new THREE.MeshPhongMaterial({
+            color: 0xff2222,
+            emissive: 0x660000,
+            transparent: true,
+            opacity: 0.9
+        });
+        
+        const deoxygenatedBloodMaterial = new THREE.MeshPhongMaterial({
+            color: 0x2222ff,
+            emissive: 0x000066,
+            transparent: true,
+            opacity: 0.9
+        });
+        
+        const valveMaterial = new THREE.MeshPhysicalMaterial({
+            color: 0xffcccc,
+            roughness: 0.3,
+            metalness: 0.1,
+            transparent: true,
+            opacity: 0.8
+        });
+        
+        const vesselMaterial = new THREE.MeshPhysicalMaterial({
+            color: 0x993333,
+            roughness: 0.5,
+            metalness: 0.1,
+            transparent: true,
+            opacity: 0.7
+        });
+        
+        // ==================== HEART MODEL ====================
+        const heartGroup = new THREE.Group();
+        scene.add(heartGroup);
+        
+        // Heart chambers
+        const chambers = {
+            rightAtrium: null,
+            rightVentricle: null,
+            leftAtrium: null,
+            leftVentricle: null
+        };
+        
+        // Create detailed heart geometry
+        function createHeartChamber(width, height, depth, position, rotation, color) {
+            const geometry = new THREE.SphereGeometry(1, 32, 32);
+            geometry.scale(width, height, depth);
+            
+            const material = new THREE.MeshPhysicalMaterial({
+                color: color,
+                roughness: 0.6,
+                metalness: 0.1,
+                clearcoat: 0.3,
+                transparent: true,
+                opacity: 0.85,
+                side: THREE.DoubleSide
+            });
+            
+            const mesh = new THREE.Mesh(geometry, material);
+            mesh.position.set(...position);
+            mesh.rotation.set(...rotation);
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+            
+            return mesh;
+        }
+        
+        // Right Atrium
+        chambers.rightAtrium = createHeartChamber(
+            0.8, 0.7, 0.6,
+            [1.2, 1.2, 0],
+            [0, 0, 0],
+            0x4444aa
+        );
+        heartGroup.add(chambers.rightAtrium);
+        
+        // Right Ventricle
+        chambers.rightVentricle = createHeartChamber(
+            0.9, 1.2, 0.7,
+            [0.8, -0.3, 0.3],
+            [0, 0, 0.2],
+            0x3333aa
+        );
+        heartGroup.add(chambers.rightVentricle);
+        
+        // Left Atrium
+        chambers.leftAtrium = createHeartChamber(
+            0.7, 0.65, 0.6,
+            [-0.8, 1.3, -0.3],
+            [0, 0, 0],
+            0xaa3333
+        );
+        heartGroup.add(chambers.leftAtrium);
+        
+        // Left Ventricle
+        chambers.leftVentricle = createHeartChamber(
+            0.85, 1.4, 0.8,
+            [-0.5, -0.4, 0],
+            [0, 0, -0.15],
+            0xaa2222
+        );
+        heartGroup.add(chambers.leftVentricle);
+        
+        // Interventricular septum
+        const septumGeometry = new THREE.BoxGeometry(0.15, 2, 1.2);
+        const septumMaterial = new THREE.MeshPhysicalMaterial({
+            color: 0x884444,
+            roughness: 0.7,
+            transparent: true,
+            opacity: 0.9
+        });
+        const septum = new THREE.Mesh(septumGeometry, septumMaterial);
+        septum.position.set(0.15, 0, 0);
+        heartGroup.add(septum);
+        
+        // ==================== BLOOD VESSELS ====================
+        
+        // Aorta
+        const aortaPath = new THREE.CatmullRomCurve3([
+            new THREE.Vector3(-0.3, 1.5, 0),
+            new THREE.Vector3(-0.3, 2.5, 0),
+            new THREE.Vector3(0, 3, 0),
+            new THREE.Vector3(0.8, 3.2, -0.5),
+            new THREE.Vector3(1.5, 2.8, -0.8),
+            new THREE.Vector3(2, 2, -1)
+        ]);
+        const aortaGeometry = new THREE.TubeGeometry(aortaPath, 64, 0.35, 16, false);
+        const aortaMaterial = new THREE.MeshPhysicalMaterial({
+            color: 0xcc3333,
+            roughness: 0.4,
+            transparent: true,
+            opacity: 0.8
+        });
+        const aorta = new THREE.Mesh(aortaGeometry, aortaMaterial);
+        heartGroup.add(aorta);
+        
+        // Pulmonary Artery
+        const pulmonaryPath = new THREE.CatmullRomCurve3([
+            new THREE.Vector3(0.5, 1.2, 0.3),
+            new THREE.Vector3(0.3, 2, 0.5),
+            new THREE.Vector3(-0.5, 2.5, 0.8),
+            new THREE.Vector3(-1.5, 2.8, 1)
+        ]);
+        const pulmonaryGeometry = new THREE.TubeGeometry(pulmonaryPath, 64, 0.3, 16, false);
+        const pulmonaryMaterial = new THREE.MeshPhysicalMaterial({
+            color: 0x3333cc,
+            roughness: 0.4,
+            transparent: true,
+            opacity: 0.8
+        });
+        const pulmonaryArtery = new THREE.Mesh(pulmonaryGeometry, pulmonaryMaterial);
+        heartGroup.add(pulmonaryArtery);
+        
+        // Superior Vena Cava
+        const svcPath = new THREE.CatmullRomCurve3([
+            new THREE.Vector3(1.5, 3.5, 0),
+            new THREE.Vector3(1.3, 2.5, 0),
+            new THREE.Vector3(1.2, 1.5, 0)
+        ]);
+        const svcGeometry = new THREE.TubeGeometry(svcPath, 32, 0.25, 12, false);
+        const svcMaterial = new THREE.MeshPhysicalMaterial({
+            color: 0x3333aa,
+            roughness: 0.4,
+            transparent: true,
+            opacity: 0.8
+        });
+        const svc = new THREE.Mesh(svcGeometry, svcMaterial);
+        heartGroup.add(svc);
+        
+        // Inferior Vena Cava
+        const ivcPath = new THREE.CatmullRomCurve3([
+            new THREE.Vector3(1.3, -2, 0.2),
+            new THREE.Vector3(1.2, -1, 0.1),
+            new THREE.Vector3(1.1, 0.5, 0)
+        ]);
+        const ivcGeometry = new THREE.TubeGeometry(ivcPath, 32, 0.28, 12, false);
+        const ivc = new THREE.Mesh(ivcGeometry, svcMaterial);
+        heartGroup.add(ivc);
+        
+        // Pulmonary Veins
+        const pvPath1 = new THREE.CatmullRomCurve3([
+            new THREE.Vector3(-2, 2, -0.5),
+            new THREE.Vector3(-1.3, 1.5, -0.3),
+            new THREE.Vector3(-0.9, 1.3, -0.2)
+        ]);
+        const pvGeometry1 = new THREE.TubeGeometry(pvPath1, 32, 0.15, 12, false);
+        const pvMaterial = new THREE.MeshPhysicalMaterial({
+            color: 0xcc3333,
+            roughness: 0.4,
+            transparent: true,
+            opacity: 0.8
+        });
+        const pv1 = new THREE.Mesh(pvGeometry1, pvMaterial);
+        heartGroup.add(pv1);
+        
+        const pvPath2 = new THREE.CatmullRomCurve3([
+            new THREE.Vector3(-2, 1.5, -0.8),
+            new THREE.Vector3(-1.3, 1.3, -0.5),
+            new THREE.Vector3(-0.9, 1.2, -0.3)
+        ]);
+        const pvGeometry2 = new THREE.TubeGeometry(pvPath2, 32, 0.15, 12, false);
+        const pv2 = new THREE.Mesh(pvGeometry2, pvMaterial);
+        heartGroup.add(pv2);
+        
+        // ==================== VALVES ====================
+        const valves = {
+            tricuspid: { mesh: null, open: false, targetRotation: 0 },
+            mitral: { mesh: null, open: false, targetRotation: 0 },
+            pulmonary: { mesh: null, open: false, targetRotation: 0 },
+            aortic: { mesh: null, open: false, targetRotation: 0 }
+        };
+        
+        function createValve(position, rotation, scale, color) {
+            const valveGroup = new THREE.Group();
+            
+            // Create 3 leaflets for realistic valve
+            for (let i = 0; i < 3; i++) {
+                const leafletGeometry = new THREE.CircleGeometry(0.25, 16, 0, Math.PI);
+                const leafletMaterial = new THREE.MeshPhysicalMaterial({
+                    color: color,
+                    roughness: 0.3,
+                    transparent: true,
+                    opacity: 0.85,
+                    side: THREE.DoubleSide
+                });
+                const leaflet = new THREE.Mesh(leafletGeometry, leafletMaterial);
+                leaflet.rotation.y = (i * Math.PI * 2) / 3;
+                leaflet.position.x = Math.cos((i * Math.PI * 2) / 3) * 0.1;
+                leaflet.position.z = Math.sin((i * Math.PI * 2) / 3) * 0.1;
+                valveGroup.add(leaflet);
+            }
+            
+            // Valve ring
+            const ringGeometry = new THREE.TorusGeometry(0.3, 0.05, 8, 24);
+            const ringMaterial = new THREE.MeshPhysicalMaterial({
+                color: 0xffeeee,
+                roughness: 0.4
+            });
+            const ring = new THREE.Mesh(ringGeometry, ringMaterial);
+            ring.rotation.x = Math.PI / 2;
+            valveGroup.add(ring);
+            
+            valveGroup.position.set(...position);
+            valveGroup.rotation.set(...rotation);
+            valveGroup.scale.set(...scale);
+            
+            return valveGroup;
+        }
+        
+        // Tricuspid Valve (Right AV)
+        valves.tricuspid.mesh = createValve(
+            [1, 0.4, 0.1],
+            [0.3, 0, 0],
+            [1, 1, 1],
+            0xffcccc
+        );
+        heartGroup.add(valves.tricuspid.mesh);
+        
+        // Mitral Valve (Left AV)
+        valves.mitral.mesh = createValve(
+            [-0.6, 0.5, -0.1],
+            [0.3, 0, 0],
+            [1, 1, 1],
+            0xffcccc
+        );
+        heartGroup.add(valves.mitral.mesh);
+        
+        // Pulmonary Valve
+        valves.pulmonary.mesh = createValve(
+            [0.5, 1.3, 0.3],
+            [-0.5, 0, 0],
+            [0.9, 0.9, 0.9],
+            0xccccff
+        );
+        heartGroup.add(valves.pulmonary.mesh);
+        
+        // Aortic Valve
+        valves.aortic.mesh = createValve(
+            [-0.3, 1.4, 0],
+            [-0.3, 0, 0],
+            [0.9, 0.9, 0.9],
+            0xffcccc
+        );
+        heartGroup.add(valves.aortic.mesh);
+        
+        // ==================== BLOOD PARTICLES ====================
+        const bloodParticles = {
+            rightSide: [],
+            leftSide: []
+        };
+        
+        class BloodParticle {
+            constructor(isOxygenated, path, speed) {
+                const geometry = new THREE.SphereGeometry(0.06, 8, 8);
+                const material = new THREE.MeshPhongMaterial({
+                    color: isOxygenated ? 0xff2222 : 0x2222ff,
+                    emissive: isOxygenated ? 0x660000 : 0x000066,
+                    transparent: true,
+                    opacity: 0.9
+                });
+                
+                this.mesh = new THREE.Mesh(geometry, material);
+                this.path = path;
+                this.progress = Math.random();
+                this.speed = speed;
+                this.isOxygenated = isOxygenated;
+                
+                heartGroup.add(this.mesh);
+            }
+            
+            update(deltaTime, heartPhase) {
+                this.progress += deltaTime * this.speed;
+                if (this.progress > 1) this.progress = 0;
+                
+                const point = this.path.getPoint(this.progress);
+                this.mesh.position.copy(point);
+                
+                // Pulse effect
+                const scale = 1 + Math.sin(Date.now() * 0.01) * 0.1;
+                this.mesh.scale.setScalar(scale);
+            }
+        }
+        
+        // Define blood flow paths
+        // Right side (deoxygenated - blue)
+        const rightAtriumToVentriclePath = new THREE.CatmullRomCurve3([
+            new THREE.Vector3(1.2, 1.2, 0),
+            new THREE.Vector3(1.1, 0.8, 0.1),
+            new THREE.Vector3(1.0, 0.4, 0.2),
+            new THREE.Vector3(0.9, 0, 0.25),
+            new THREE.Vector3(0.8, -0.3, 0.3)
+        ]);
+        
+        const rightVentricleToPulmonaryPath = new THREE.CatmullRomCurve3([
+            new THREE.Vector3(0.8, -0.3, 0.3),
+            new THREE.Vector3(0.7, 0.3, 0.35),
+            new THREE.Vector3(0.6, 0.8, 0.4),
+            new THREE.Vector3(0.5, 1.2, 0.45),
+            new THREE.Vector3(0.3, 1.8, 0.55),
+            new THREE.Vector3(-0.2, 2.2, 0.7),
+            new THREE.Vector3(-1, 2.5, 0.9)
+        ]);
+        
+        const svcToRightAtriumPath = new THREE.CatmullRomCurve3([
+            new THREE.Vector3(1.4, 3.2, 0),
+            new THREE.Vector3(1.3, 2.5, 0),
+            new THREE.Vector3(1.25, 2, 0),
+            new THREE.Vector3(1.2, 1.5, 0),
+            new THREE.Vector3(1.2, 1.2, 0)
+        ]);
+        
+        const ivcToRightAtriumPath = new THREE.CatmullRomCurve3([
+            new THREE.Vector3(1.3, -1.8, 0.2),
+            new THREE.Vector3(1.25, -1, 0.15),
+            new THREE.Vector3(1.2, 0, 0.1),
+            new THREE.Vector3(1.2, 0.8, 0.05),
+            new THREE.Vector3(1.2, 1.2, 0)
+        ]);
+        
+        // Left side (oxygenated - red)
+        const pulmonaryVeinsToLeftAtriumPath = new THREE.CatmullRomCurve3([
+            new THREE.Vector3(-1.8, 2, -0.5),
+            new THREE.Vector3(-1.3, 1.6, -0.4),
+            new THREE.Vector3(-1, 1.4, -0.35),
+            new THREE.Vector3(-0.8, 1.3, -0.3)
+        ]);
+        
+        const leftAtriumToVentriclePath = new THREE.CatmullRomCurve3([
+            new THREE.Vector3(-0.8, 1.3, -0.2),
+            new THREE.Vector3(-0.7, 0.9, -0.1),
+            new THREE.Vector3(-0.6, 0.5, 0),
+            new THREE.Vector3(-0.55, 0.1, 0),
+            new THREE.Vector3(-0.5, -0.4, 0)
+        ]);
+        
+        const leftVentricleToAortaPath = new THREE.CatmullRomCurve3([
+            new THREE.Vector3(-0.5, -0.4, 0),
+            new THREE.Vector3(-0.4, 0.2, 0),
+            new THREE.Vector3(-0.35, 0.8, 0),
+            new THREE.Vector3(-0.3, 1.4, 0),
+            new THREE.Vector3(-0.3, 2, 0),
+            new THREE.Vector3(0, 2.8, -0.2),
+            new THREE.Vector3(0.8, 3.1, -0.5),
+            new THREE.Vector3(1.8, 2.5, -0.9)
+        ]);
+        
+        // Create blood particles
+        function createBloodParticles() {
+            // Right side particles (deoxygenated)
+            for (let i = 0; i < 15; i++) {
+                bloodParticles.rightSide.push(new BloodParticle(false, svcToRightAtriumPath, 0.3 + Math.random() * 0.2));
+            }
+            for (let i = 0; i < 15; i++) {
+                bloodParticles.rightSide.push(new BloodParticle(false, ivcToRightAtriumPath, 0.3 + Math.random() * 0.2));
+            }
+            for (let i = 0; i < 20; i++) {
+                bloodParticles.rightSide.push(new BloodParticle(false, rightAtriumToVentriclePath, 0.4 + Math.random() * 0.2));
+            }
+            for (let i = 0; i < 20; i++) {
+                bloodParticles.rightSide.push(new BloodParticle(false, rightVentricleToPulmonaryPath, 0.35 + Math.random() * 0.2));
+            }
+            
+            // Left side particles (oxygenated)
+            for (let i = 0; i < 15; i++) {
+                bloodParticles.leftSide.push(new BloodParticle(true, pulmonaryVeinsToLeftAtriumPath, 0.3 + Math.random() * 0.2));
+            }
+            for (let i = 0; i < 20; i++) {
+                bloodParticles.leftSide.push(new BloodParticle(true, leftAtriumToVentriclePath, 0.4 + Math.random() * 0.2));
+            }
+            for (let i = 0; i < 20; i++) {
+                bloodParticles.leftSide.push(new BloodParticle(true, leftVentricleToAortaPath, 0.35 + Math.random() * 0.2));
+            }
+        }
+        
+        createBloodParticles();
+        
+        // ==================== CARDIAC CYCLE SIMULATION ====================
+        let heartRate = 72;
+        let cycleTime = 0;
+        let isPaused = false;
+        let lastTime = performance.now();
+        
+        // Cardiac cycle phases
+        // 0-0.1: Atrial systole
+        // 0.1-0.4: Ventricular systole (isovolumetric + ejection)
+        // 0.4-1.0: Diastole (relaxation + filling)
+        
+        function updateCardiacCycle(deltaTime) {
+            if (isPaused) return;
+            
+            const cycleDuration = 60 / heartRate; // in seconds
+            cycleTime += deltaTime / cycleDuration;
+            if (cycleTime > 1) cycleTime -= 1;
+            
+            const phase = cycleTime;
+            
+            // Determine cardiac phase for display
+            let phaseText = "Diastole";
+            let phaseClass = "diastole";
+            
+            if (phase < 0.1) {
+                phaseText = "Atrial Systole";
+                phaseClass = "systole";
+            } else if (phase < 0.4) {
+                phaseText = "Ventricular Systole";
+                phaseClass = "systole";
+            } else if (phase < 0.5) {
+                phaseText = "Isovolumetric Relaxation";
+                phaseClass = "diastole";
+            } else {
+                phaseText = "Ventricular Diastole";
+                phaseClass = "diastole";
+            }
+            
+            document.getElementById('cardiac-phase').textContent = phaseText;
+            document.getElementById('cardiac-phase').className = `stat-value ${phaseClass}`;
+            
+            // Update valve states
+            updateValves(phase);
+            
+            // Animate heart chambers
+            animateHeart(phase);
+            
+            // Update blood particles
+            updateBloodParticles(deltaTime, phase);
+        }
+        
+        function updateValves(phase) {
+            // AV valves (tricuspid, mitral) open during diastole, closed during systole
+            // Semilunar valves (pulmonary, aortic) open during systole ejection, closed otherwise
+            
+            const avValvesOpen = phase > 0.45;
+            const semilunarValvesOpen = phase > 0.15 && phase < 0.4;
+            
+            // Update valve visual states
+            valves.tricuspid.open = avValvesOpen;
+            valves.mitral.open = avValvesOpen;
+            valves.pulmonary.open = semilunarValvesOpen;
+            valves.aortic.open = semilunarValvesOpen;
+            
+            // Animate valve leaflets
+            animateValve(valves.tricuspid, avValvesOpen);
+            animateValve(valves.mitral, avValvesOpen);
+            animateValve(valves.pulmonary, semilunarValvesOpen);
+            animateValve(valves.aortic, semilunarValvesOpen);
+            
+            // Update UI
+            updateValveStatus('tricuspid-status', avValvesOpen);
+            updateValveStatus('mitral-status', avValvesOpen);
+            updateValveStatus('pulmonary-status', semilunarValvesOpen);
+            updateValveStatus('aortic-status', semilunarValvesOpen);
+        }
+        
+        function animateValve(valve, isOpen) {
+            const targetRotation = isOpen ? -Math.PI / 3 : 0;
+            valve.mesh.children.forEach((child, index) => {
+                if (index < 3) { // Leaflets only
+                    child.rotation.x += (targetRotation - child.rotation.x) * 0.15;
+                }
+            });
+        }
+        
+        function updateValveStatus(elementId, isOpen) {
+            const element = document.getElementById(elementId);
+            if (isOpen) {
+                element.className = 'valve-indicator valve-open';
+                element.textContent = element.textContent.split(' ')[0] + ' (Open)';
+            } else {
+                element.className = 'valve-indicator valve-closed';
+                element.textContent = element.textContent.split(' ')[0] + ' (Closed)';
+            }
+        }
+        
+        function animateHeart(phase) {
+            // Atrial contraction (phase 0-0.1)
+            const atrialContraction = phase < 0.1 ? Math.sin(phase * Math.PI / 0.1) : 0;
+            
+            // Ventricular contraction (phase 0.1-0.4)
+            let ventricularContraction = 0;
+            if (phase >= 0.1 && phase < 0.4) {
+                ventricularContraction = Math.sin((phase - 0.1) * Math.PI / 0.3);
+            }
+            
+            // Animate atria
+            const atrialScale = 1 - atrialContraction * 0.15;
+            chambers.rightAtrium.scale.set(atrialScale, atrialScale, atrialScale);
+            chambers.leftAtrium.scale.set(atrialScale, atrialScale, atrialScale);
+            
+            // Animate ventricles
+            const ventricularScale = 1 - ventricularContraction * 0.2;
+            const ventricularScaleY = 1 - ventricularContraction * 0.15;
+            chambers.rightVentricle.scale.set(ventricularScale, ventricularScaleY, ventricularScale);
+            chambers.leftVentricle.scale.set(ventricularScale, ventricularScaleY, ventricularScale);
+            
+            // Whole heart pulse
+            const heartPulse = 1 + Math.sin(phase * Math.PI * 2) * 0.02;
+            heartGroup.scale.setScalar(heartPulse);
+            
+            // Subtle rotation during contraction
+            heartGroup.rotation.z = Math.sin(phase * Math.PI * 2) * 0.02;
+        }
+        
+        function updateBloodParticles(deltaTime, phase) {
+            // Adjust particle speeds based on cardiac phase
+            const ejectionPhase = phase > 0.15 && phase < 0.4;
+            const fillingPhase = phase > 0.5;
+            
+            // Update right side particles
+            bloodParticles.rightSide.forEach(particle => {
+                let speedMultiplier = 1;
+                if (ejectionPhase && particle.path === rightVentricleToPulmonaryPath) {
+                    speedMultiplier = 2;
+                }
+                if (fillingPhase && particle.path === rightAtriumToVentriclePath) {
+                    speedMultiplier = 1.5;
+                }
+                particle.progress += deltaTime * particle.speed * speedMultiplier;
+                if (particle.progress > 1) particle.progress = 0;
+                
+                const point = particle.path.getPoint(particle.progress);
+                particle.mesh.position.copy(point);
+            });
+            
+            // Update left side particles
+            bloodParticles.leftSide.forEach(particle => {
+                let speedMultiplier = 1;
+                if (ejectionPhase && particle.path === leftVentricleToAortaPath) {
+                    speedMultiplier = 2.5;
+                }
+                if (fillingPhase && particle.path === leftAtriumToVentriclePath) {
+                    speedMultiplier = 1.5;
+                }
+                particle.progress += deltaTime * particle.speed * speedMultiplier;
+                if (particle.progress > 1) particle.progress = 0;
+                
+                const point = particle.path.getPoint(particle.progress);
+                particle.mesh.position.copy(point);
+            });
+        }
+        
+        // ==================== ECG SIMULATION ====================
+        const ecgCanvas = document.getElementById('ecg-canvas');
+        const ecgCtx = ecgCanvas.getContext('2d');
+        let ecgData = [];
+        
+        function generateECG(phase) {
+            let voltage = 0;
+            
+            // P wave (atrial depolarization)
+            if (phase < 0.1) {
+                voltage = 0.25 * Math.sin(phase * Math.PI / 0.1);
+            }
+            // PR segment
+            else if (phase < 0.15) {
+                voltage = 0;
+            }
+            // QRS complex (ventricular depolarization)
+            else if (phase < 0.17) {
+                voltage = -0.1;
+            }
+            else if (phase < 0.19) {
+                voltage = 1.0 * ((phase - 0.17) / 0.02);
+            }
+            else if (phase < 0.21) {
+                voltage = 1.0 - 1.3 * ((phase - 0.19) / 0.02);
+            }
+            else if (phase < 0.23) {
+                voltage = -0.3 + 0.3 * ((phase - 0.21) / 0.02);
+            }
+            // ST segment
+            else if (phase < 0.35) {
+                voltage = 0.05;
+            }
+            // T wave (ventricular repolarization)
+            else if (phase < 0.5) {
+                voltage = 0.3 * Math.sin((phase - 0.35) * Math.PI / 0.15);
+            }
+            // Baseline
+            else {
+                voltage = 0;
+            }
+            
+            return voltage;
+        }
+        
+        function drawECG() {
+            ecgCtx.fillStyle = '#0a0a0a';
+            ecgCtx.fillRect(0, 0, ecgCanvas.width, ecgCanvas.height);
+            
+            // Grid
+            ecgCtx.strokeStyle = '#1a3a1a';
+            ecgCtx.lineWidth = 0.5;
+            for (let i = 0; i < ecgCanvas.width; i += 15) {
+                ecgCtx.beginPath();
+                ecgCtx.moveTo(i, 0);
+                ecgCtx.lineTo(i, ecgCanvas.height);
+                ecgCtx.stroke();
+            }
+            for (let i = 0; i < ecgCanvas.height; i += 15) {
+                ecgCtx.beginPath();
+                ecgCtx.moveTo(0, i);
+                ecgCtx.lineTo(ecgCanvas.width, i);
+                ecgCtx.stroke();
+            }
+            
+            // ECG trace
+            const voltage = generateECG(cycleTime);
+            ecgData.push(voltage);
+            if (ecgData.length > ecgCanvas.width) {
+                ecgData.shift();
+            }
+            
+            ecgCtx.strokeStyle = '#00ff00';
+            ecgCtx.lineWidth = 2;
+            ecgCtx.beginPath();
+            
+            for (let i = 0; i < ecgData.length; i++) {
+                const x = i;
+                const y = ecgCanvas.height / 2 - ecgData[i] * 40;
+                if (i === 0) {
+                    ecgCtx.moveTo(x, y);
+                } else {
+                    ecgCtx.lineTo(x, y);
+                }
+            }
+            ecgCtx.stroke();
+            
+            // Glow effect
+            ecgCtx.shadowBlur = 10;
+            ecgCtx.shadowColor = '#00ff00';
+        }
+        
+        // ==================== CAMERA CONTROLS ====================
+        let isDragging = false;
+        let previousMousePosition = { x: 0, y: 0 };
+        let cameraAngle = { x: 0, y: 0 };
+        let cameraDistance = 8;
+        
+        container.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            previousMousePosition = { x: e.clientX, y: e.clientY };
+        });
+        
+        container.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            
+            const deltaX = e.clientX - previousMousePosition.x;
+            const deltaY = e.clientY - previousMousePosition.y;
+            
+            cameraAngle.x += deltaX * 0.01;
+            cameraAngle.y += deltaY * 0.01;
+            cameraAngle.y = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, cameraAngle.y));
+            
+            previousMousePosition = { x: e.clientX, y: e.clientY };
+        });
+        
+        container.addEventListener('mouseup', () => {
+            isDragging = false;
+        });
+        
+        container.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            cameraDistance += e.deltaY * 0.01;
+            cameraDistance = Math.max(4, Math.min(15, cameraDistance));
+        });
+        
+        // Touch support
+        container.addEventListener('touchstart', (e) => {
+            if (e.touches.length === 1) {
+                isDragging = true;
+                previousMousePosition = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+            }
+        });
+        
+        container.addEventListener('touchmove', (e) => {
+            if (!isDragging || e.touches.length !== 1) return;
+            
+            const deltaX = e.touches[0].clientX - previousMousePosition.x;
+            const deltaY = e.touches[0].clientY - previousMousePosition.y;
+            
+            cameraAngle.x += deltaX * 0.01;
+            cameraAngle.y += deltaY * 0.01;
+            cameraAngle.y = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, cameraAngle.y));
+            
+            previousMousePosition = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+        });
+        
+        container.addEventListener('touchend', () => {
+            isDragging = false;
+        });
+        
+        function updateCamera() {
+            camera.position.x = Math.sin(cameraAngle.x) * Math.cos(cameraAngle.y) * cameraDistance;
+            camera.position.y = Math.sin(cameraAngle.y) * cameraDistance;
+            camera.position.z = Math.cos(cameraAngle.x) * Math.cos(cameraAngle.y) * cameraDistance;
+            camera.lookAt(0, 0, 0);
+        }
+        
+        // ==================== UI CONTROLS ====================
+        const rateSlider = document.getElementById('rate-slider');
+        const rateDisplay = document.getElementById('rate-display');
+        
+        rateSlider.addEventListener('input', () => {
+            heartRate = parseInt(rateSlider.value);
+            rateDisplay.textContent = heartRate;
+            document.getElementById('heart-rate').textContent = heartRate + ' BPM';
+            
+            // Update cardiac output
+            const strokeVolume = 70;
+            const cardiacOutput = (heartRate * strokeVolume / 1000).toFixed(1);
+            document.getElementById('cardiac-output').textContent = cardiacOutput + ' L/min';
+        });
+        
+        document.getElementById('btn-pause').addEventListener('click', function() {
+            isPaused = !isPaused;
+            this.textContent = isPaused ? 'Resume' : 'Pause';
+            this.classList.toggle('active', isPaused);
+        });
+        
+        let isCutaway = false;
+        document.getElementById('btn-cutaway').addEventListener('click', function() {
+            isCutaway = !isCutaway;
+            this.classList.toggle('active', isCutaway);
+            
+            // Toggle cutaway view by adjusting clipping
+            Object.values(chambers).forEach(chamber => {
+                if (isCutaway) {
+                    chamber.material.clippingPlanes = [new THREE.Plane(new THREE.Vector3(0, 0, 1), 0)];
+                    chamber.material.clipShadows = true;
+                } else {
+                    chamber.material.clippingPlanes = [];
+                }
+            });
+            
+            renderer.localClippingEnabled = isCutaway;
+        });
+        
+        let isXray = false;
+        document.getElementById('btn-xray').addEventListener('click', function() {
+            isXray = !isXray;
+            this.classList.toggle('active', isXray);
+            
+            Object.values(chambers).forEach(chamber => {
+                chamber.material.opacity = isXray ? 0.3 : 0.85;
+                chamber.material.wireframe = isXray;
+            });
+        });
+        
+        let showLabels = false;
+        const labels = [];
+        
+        function createLabel(text, position) {
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            canvas.width = 256;
+            canvas.height = 64;
+            
+            context.fillStyle = 'rgba(0, 0, 0, 0.8)';
+            context.fillRect(0, 0, canvas.width, canvas.height);
+            context.strokeStyle = '#ffffff';
+            context.strokeRect(0, 0, canvas.width, canvas.height);
+            
+            context.font = 'bold 24px Arial';
+            context.fillStyle = '#ffffff';
+            context.textAlign = 'center';
+            context.textBaseline = 'middle';
+            context.fillText(text, canvas.width / 2, canvas.height / 2);
+            
+            const texture = new THREE.CanvasTexture(canvas);
+            const material = new THREE.SpriteMaterial({ map: texture, transparent: true });
+            const sprite = new THREE.Sprite(material);
+            sprite.position.set(...position);
+            sprite.scale.set(1.5, 0.4, 1);
+            sprite.visible = false;
+            
+            heartGroup.add(sprite);
+            labels.push(sprite);
+            
+            return sprite;
+        }
+        
+        // Create anatomical labels
+        createLabel('Right Atrium', [1.8, 1.2, 0.5]);
+        createLabel('Right Ventricle', [1.5, -0.5, 0.8]);
+        createLabel('Left Atrium', [-1.5, 1.3, 0.3]);
+        createLabel('Left Ventricle', [-1.3, -0.5, 0.5]);
+        createLabel('Aorta', [0.5, 3, 0.3]);
+        createLabel('Pulmonary Artery', [-0.8, 2.8, 1]);
+        createLabel('Superior Vena Cava', [2, 3, 0.3]);
+        createLabel('Inferior Vena Cava', [1.8, -1.5, 0.5]);
+        createLabel('Tricuspid Valve', [1.5, 0.4, 0.6]);
+        createLabel('Mitral Valve', [-1.1, 0.5, 0.4]);
+        createLabel('Pulmonary Valve', [1, 1.5, 0.8]);
+        createLabel('Aortic Valve', [-0.8, 1.6, 0.4]);
+        
+        document.getElementById('btn-labels').addEventListener('click', function() {
+            showLabels = !showLabels;
+            this.classList.toggle('active', showLabels);
+            labels.forEach(label => label.visible = showLabels);
+        });
+        
+        document.getElementById('btn-reset').addEventListener('click', () => {
+            cameraAngle = { x: 0, y: 0 };
+            cameraDistance = 8;
+            heartRate = 72;
+            rateSlider.value = 72;
+            rateDisplay.textContent = 72;
+            document.getElementById('heart-rate').textContent = '72 BPM';
+            document.getElementById('cardiac-output').textContent = '5.0 L/min';
+        });
+        
+        // ==================== ANIMATION LOOP ====================
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            const currentTime = performance.now();
+            const deltaTime = (currentTime - lastTime) / 1000;
+            lastTime = currentTime;
+            
+            updateCamera();
+            updateCardiacCycle(deltaTime);
+            drawECG();
+            
+            renderer.render(scene, camera);
+        }
+        
+        // ==================== WINDOW RESIZE ====================
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+        
+        // ==================== START ====================
+        animate();
+    </script>
+</body>
+</html>
+
+
