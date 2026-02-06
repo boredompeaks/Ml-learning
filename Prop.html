@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SYSTEM UPDATE: PENDING ACTION</title>
+    <style>
+        :root {
+            --bg: #030305;
+            --glass: rgba(20, 20, 35, 0.7);
+            --cyan: #00f3ff;
+            --pink: #ff0055;
+            --text: #e0e0e0;
+            --font-mono: 'Courier New', Courier, monospace;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: var(--font-mono);
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-image: 
+                radial-gradient(circle at 50% 50%, rgba(255, 0, 85, 0.05) 0%, transparent 50%),
+                linear-gradient(rgba(0, 243, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 243, 255, 0.03) 1px, transparent 1px);
+            background-size: 100% 100%, 30px 30px, 30px 30px;
+        }
+
+        /* --- UI UTILS --- */
+        .hidden { display: none !important; }
+        .fade-in { animation: fadeIn 0.8s ease forwards; }
+        .shake { animation: shake 0.5s ease-in-out; }
+        
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+        @keyframes pulse2D { 0% { transform: scale(1); } 15% { transform: scale(1.15); } 30% { transform: scale(1); } 45% { transform: scale(1.15); } 100% { transform: scale(1); } }
+
+        /* --- SCREEN 1: LOGIN --- */
+        #login-screen { width: 90%; max-width: 400px; text-align: center; z-index: 10; }
+        
+        .scanner-ring {
+            width: 100px; height: 100px;
+            border: 2px solid var(--cyan); border-radius: 50%;
+            margin: 0 auto 20px; position: relative;
+            box-shadow: 0 0 15px var(--cyan); animation: pulseScan 2s infinite;
+        }
+        .scanner-ring::after {
+            content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            border-radius: 50%; border: 2px solid var(--pink);
+            animation: spin 3s linear infinite; opacity: 0.5;
+        }
+
+        h1 { font-size: 1rem; letter-spacing: 2px; margin-bottom: 2rem; color: var(--cyan); text-transform: uppercase; }
+        
+        input {
+            background: rgba(0,0,0,0.5); border: 1px solid #333;
+            padding: 12px; width: 100%; color: var(--cyan);
+            font-family: inherit; font-size: 1.1rem; text-align: center;
+            outline: none; border-radius: 4px; transition: 0.3s; margin-bottom: 10px;
+        }
+        input:focus { border-color: var(--pink); box-shadow: 0 0 10px rgba(255, 0, 85, 0.3); }
+
+        .btn {
+            background: var(--cyan); color: #000; border: none;
+            padding: 12px 30px; font-weight: bold; cursor: pointer;
+            font-family: inherit; text-transform: uppercase; letter-spacing: 1px;
+            clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+            transition: 0.3s; margin-top: 10px;
+        }
+        .btn:hover { background: var(--pink); color: #fff; box-shadow: 0 0 15px var(--pink); transform: translateY(-2px); }
+
+        #error-msg { color: var(--pink); font-size: 0.8rem; margin-top: 15px; height: 1.2rem; }
+
+        /* --- SCREEN 2: TERMINAL --- */
+        #terminal-screen { width: 100%; max-width: 600px; padding: 20px; text-align: left; z-index: 10; }
+        .line { margin-bottom: 8px; font-size: 0.9rem; line-height: 1.4; text-shadow: 0 0 5px rgba(0, 243, 255, 0.5); }
+        .highlight { color: var(--pink); font-weight: bold; }
+
+        /* --- SCREEN 3: DASHBOARD --- */
+        #dashboard-screen { width: 100%; max-width: 500px; padding: 20px; z-index: 10; display: flex; flex-direction: column; gap: 20px; }
+        
+        .card {
+            background: var(--glass);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 20px; border-radius: 12px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            position: relative; overflow: hidden; transition: height 0.3s;
+        }
+        .card::before {
+            content: ''; position: absolute; top: 0; left: 0; width: 4px; height: 100%;
+            background: linear-gradient(to bottom, var(--cyan), var(--pink));
+        }
+
+        .user-badge { display: flex; align-items: center; gap: 15px; margin-bottom: 15px; }
+        .avatar-placeholder {
+            width: 50px; height: 50px; background: #222; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center; font-size: 1.5rem;
+            border: 2px solid var(--pink); box-shadow: 0 0 10px var(--pink);
+            cursor: pointer;
+        }
+        
+        .stat-row { display: flex; justify-content: space-between; font-size: 0.8rem; margin-top: 10px; color: #888; }
+        .stat-bar { height: 6px; background: #333; border-radius: 3px; margin-top: 5px; overflow: hidden; }
+        .stat-fill { height: 100%; width: 0%; transition: width 1.5s ease-out; }
+        .fill-cyan { background: var(--cyan); }
+        .fill-pink { background: var(--pink); }
+
+        .proposal-text { font-size: 0.9rem; line-height: 1.6; margin: 15px 0; color: #ccc; }
+        .proposal-text strong { color: var(--cyan); }
+
+        .action-area { display: flex; gap: 15px; margin-top: 10px; position: relative; height: 50px; }
+        
+        .btn-accept {
+            flex: 1; background: linear-gradient(45deg, var(--pink), #ff5588);
+            border: none; color: white; border-radius: 8px; font-weight: bold;
+            box-shadow: 0 5px 15px rgba(255, 0, 85, 0.4); cursor: pointer; z-index: 2;
+        }
+        
+        .btn-decline {
+            flex: 1; background: transparent; border: 1px solid #555;
+            color: #777; border-radius: 8px; font-weight: bold; cursor: pointer;
+            transition: 0.2s; position: relative; z-index: 1;
+        }
+
+        /* --- 2D HEART --- */
+        .pulsing-heart {
+            font-size: 4rem; text-align: center; margin: 20px 0;
+            animation: pulse2D 1.2s infinite; cursor: pointer;
+            filter: drop-shadow(0 0 10px var(--pink));
+        }
+
+        /* --- MODAL FOR "ARE YOU SURE" --- */
+        #modal-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 100;
+            display: flex; align-items: center; justify-content: center; backdrop-filter: blur(5px);
+        }
+
+        @keyframes pulseScan { 0% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.1); opacity: 0.7; } 100% { transform: scale(1); opacity: 1; } }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        #confetti-canvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 50; }
+
+    </style>
+</head>
+<body>
+
+    <canvas id="confetti-canvas"></canvas>
+
+    <div id="login-screen">
+        <div class="scanner-ring" onclick="easterEgg('scanner')"></div>
+        <h1>Biometric Identification</h1>
+        <div style="position:relative">
+            <input type="text" id="name-input" placeholder="ENTER SUBJECT ID" autocomplete="off" spellcheck="false">
+        </div>
+        <button class="btn" onclick="attemptLogin()">VERIFY</button>
+        <div id="error-msg"></div>
+    </div>
+
+    <div id="terminal-screen" class="hidden">
+        <div id="terminal-content"></div>
+    </div>
+
+    <div id="dashboard-screen" class="hidden">
+        
+        <div class="card fade-in" style="animation-delay: 0.1s;">
+            <div class="user-badge">
+                <div class="avatar-placeholder" onclick="easterEgg('avatar')">A</div>
+                <div>
+                    <h2 style="color:var(--text); font-size:1.1rem;">SUBJECT: ASMA</h2>
+                    <p style="font-size:0.7rem; color:var(--cyan);">STATUS: VERIFIED // NOT EVERYONE</p>
+                </div>
+            </div>
+            
+            <div class="stat-row"><span>PATIENCE LEVEL</span><span id="patience-val">0%</span></div>
+            <div class="stat-bar"><div class="stat-fill fill-cyan" id="patience-bar"></div></div>
+
+            <div class="stat-row" style="margin-top:15px;"><span>COMPATIBILITY</span><span id="compat-val">UNKNOWN</span></div>
+            <div class="stat-bar"><div class="stat-fill fill-pink" id="compat-bar"></div></div>
+        </div>
+
+        <div class="pulsing-heart hidden fade-in" id="heart-display" onclick="easterEgg('heart')">❤️</div>
+
+        <div class="card fade-in" id="proposal-card" style="animation-delay: 0.4s;">
+            <h3 style="color:var(--pink); font-size:0.9rem; margin-bottom:10px;" id="prop-title">⚠️ SYSTEM NOTIFICATION</h3>
+            <div id="prop-content">
+                <p class="proposal-text">
+                    Protocol Override Initiated.<br><br>
+                    Current Status: <strong>"Everyone"</strong> (Database Error)<br>
+                    Proposed Status: <strong>Designated VIP</strong> (Admin Override)<br><br>
+                    <strong>Terms:</strong> Exclusive access to developer's patience, priority message routing, and immunity from resignation.
+                </p>
+
+                <div class="action-area" id="phase1-btns">
+                    <button class="btn-accept" onclick="phaseTwo()">ACCEPT PROMOTION</button>
+                    <button class="btn-decline" id="btn-jump">DECLINE</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-overlay" class="hidden">
+        <div class="card" style="width: 80%; max-width: 300px; text-align: center;">
+            <h2 style="color:var(--pink); margin-bottom: 10px;">⚠️ WAIT</h2>
+            <p style="font-size: 0.9rem; margin-bottom: 20px;">Are you absolutely sure?</p>
+            <div style="display: flex; gap: 10px;">
+                <button class="btn-decline" onclick="closeModal()">NO, GO BACK</button>
+                <button class="btn-accept" onclick="confirmSad()">YES</button>
+            </div>
+        </div>
+    </div>
+
+<script>
+    // --- CONFIG & STATE ---
+    const TERMINAL_LINES = [
+        "> INITIALIZING BIOMETRIC SCAN...",
+        "> CHECKING CLEARANCE: 'ASMA'",
+        "> SCANNING PATIENCE LEVEL... [MAXIMUM]",
+        "> COMPILING 'EVERYONE' DATABASE...",
+        "> ERROR: SUBJECT ID NOT FOUND IN 'EVERYONE'.",
+        "> RE-CALCULATING SOCIAL GRAPH...",
+        "> MATCH FOUND: 'DESIGNATED_VIP'.",
+        "> PROMOTION STATUS: PENDING APPROVAL..."
+    ];
+    let clickCount = 0;
+
+    // --- DOM ELEMENTS ---
+    const loginScreen = document.getElementById('login-screen');
+    const terminalScreen = document.getElementById('terminal-screen');
+    const terminalContent = document.getElementById('terminal-content');
+    const dashboardScreen = document.getElementById('dashboard-screen');
+    const nameInput = document.getElementById('name-input');
+    const errorMsg = document.getElementById('error-msg');
+    const btnJump = document.getElementById('btn-jump');
+    const proposalCard = document.getElementById('proposal-card');
+    const propContent = document.getElementById('prop-content');
+    const modalOverlay = document.getElementById('modal-overlay');
+
+    // --- LOGIN ---
+    function attemptLogin() {
+        const val = nameInput.value.trim().toLowerCase();
+        if (val === 'asma') {
+            errorMsg.innerText = "IDENTITY CONFIRMED.";
+            errorMsg.style.color = "var(--cyan)";
+            setTimeout(() => {
+                loginScreen.classList.add('hidden');
+                terminalScreen.classList.remove('hidden');
+                runTerminal();
+            }, 800);
+        } else {
+            errorMsg.innerText = "ACCESS DENIED: SUBJECT IS 'EVERYONE'.";
+            loginScreen.classList.add('shake');
+            setTimeout(() => loginScreen.classList.remove('shake'), 500);
+            nameInput.value = '';
+        }
+    }
+
+    // --- TERMINAL ---
+    function runTerminal() {
+        let i = 0;
+        function typeLine() {
+            if (i < TERMINAL_LINES.length) {
+                const p = document.createElement('p');
+                p.className = 'line';
+                let text = TERMINAL_LINES[i];
+                if(text.includes('ERROR')) p.style.color = 'var(--pink)';
+                else if(text.includes('MATCH')) p.style.color = 'var(--cyan)';
+                p.innerText = text;
+                terminalContent.appendChild(p);
+                i++;
+                window.scrollTo(0, document.body.scrollHeight);
+                setTimeout(typeLine, 600 + Math.random() * 400);
+            } else {
+                setTimeout(() => {
+                    terminalScreen.classList.add('hidden');
+                    dashboardScreen.classList.remove('hidden');
+                    runDashboardStats();
+                }, 1500);
+            }
+        }
+        typeLine();
+    }
+
+    // --- DASHBOARD ---
+    function runDashboardStats() {
+        setTimeout(() => {
+            document.getElementById('patience-bar').style.width = "100%";
+            document.getElementById('patience-val').innerText = "100% (GOD TIER)";
+        }, 500);
+        setTimeout(() => {
+            document.getElementById('compat-bar').style.width = "98%";
+            document.getElementById('compat-val').innerText = "CRITICAL MASS";
+        }, 1200);
+        setTimeout(() => {
+            document.getElementById('heart-display').classList.remove('hidden');
+        }, 2000);
+        initJumpButton();
+    }
+
+    // --- BUTTON PHYSICS (PHASE 1) ---
+    function initJumpButton() {
+        const moveBtn = () => {
+            const x = Math.random() * (window.innerWidth - btnJump.offsetWidth - 20);
+            const y = Math.random() * (window.innerHeight - btnJump.offsetHeight - 20);
+            btnJump.style.position = 'fixed';
+            btnJump.style.left = `${x}px`;
+            btnJump.style.top = `${y}px`;
+            btnJump.style.borderColor = "var(--pink)";
+            btnJump.style.color = "var(--pink)";
+            btnJump.innerText = "DENIED";
+        };
+        btnJump.addEventListener('mouseenter', moveBtn);
+        btnJump.addEventListener('touchstart', (e) => { e.preventDefault(); moveBtn(); });
+    }
+
+    // --- PHASE 2: ARE YOU HAPPY? ---
+    function phaseTwo() {
+        // Clear jumping button listener clone hack
+        const oldBtn = document.getElementById('btn-jump');
+        if(oldBtn) oldBtn.remove(); // Remove the jumping button entirely for phase 2
+
+        propContent.style.opacity = '0';
+        setTimeout(() => {
+            document.getElementById('prop-title').innerText = "❤️ FINAL VERIFICATION";
+            propContent.innerHTML = `
+                <p class="proposal-text" style="text-align:center; font-size:1.1rem;">
+                    Promotion Accepted.<br><br>
+                    One last question:<br>
+                    <strong>Are you happy?</strong>
+                </p>
+                <div class="action-area">
+                    <button class="btn-accept" onclick="finalHappy()">YES</button>
+                    <button class="btn-decline" onclick="askSure()">NO</button>
+                </div>
+            `;
+            propContent.style.opacity = '1';
+        }, 300);
+    }
+
+    // --- FINAL OUTCOMES ---
+    function finalHappy() {
+        fireConfetti('happy');
+        propContent.innerHTML = `
+            <p class="proposal-text" style="text-align:center;">
+                <strong style="font-size:1.2rem; color:var(--cyan);">SYSTEM OPTIMAL</strong><br><br>
+                Happiness levels synchronized.<br>
+                Welcome to the VIP lounge.<br>
+                <small style="color:#666">Check your messages for the real reward.</small>
+            </p>
+        `;
+        document.body.style.animation = "bgPulse 1s infinite";
+    }
+
+    function askSure() {
+        fireConfetti('sad'); // Immediate heartbreak burst
+        modalOverlay.classList.remove('hidden');
+    }
+
+    function closeModal() {
+        modalOverlay.classList.add('hidden');
+    }
+
+    function confirmSad() {
+        modalOverlay.classList.add('hidden');
+        propContent.innerHTML = `
+            <p class="proposal-text" style="text-align:center; color:var(--pink);">
+                <strong>ERROR 404: SADNESS NOT ALLOWED</strong><br><br>
+                System has overridden your choice.<br>
+                Forcing happiness protocol...<br>
+                <br>
+                (Nice try though 😉)
+            </p>
+        `;
+        setTimeout(() => fireConfetti('happy'), 2000); // Force happy after 2s
+    }
+
+    // --- EASTER EGGS ---
+    function easterEgg(type) {
+        clickCount++;
+        if(type === 'heart') {
+             const h = document.getElementById('heart-display');
+             h.style.transform = `scale(${1 + clickCount * 0.1})`;
+             if(clickCount > 5) alert("Okay, relax with the heart, it's already yours. 🙄");
+        }
+        if(type === 'avatar') {
+            alert("Scanning... Yup, still the only one.");
+        }
+    }
+
+    // --- PARTICLE SYSTEM ---
+    function fireConfetti(mood) {
+        const canvas = document.getElementById('confetti-canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        const particles = [];
+        const happyEmojis = ['😊', '🎉', '💖', '😁', '✨'];
+        const sadEmojis = ['💔', '😢', '🌧️', '🥀'];
+        const emojis = mood === 'happy' ? happyEmojis : sadEmojis;
+
+        for(let i=0; i<80; i++) {
+            particles.push({
+                x: window.innerWidth / 2,
+                y: window.innerHeight / 2,
+                vx: (Math.random() - 0.5) * 20,
+                vy: (Math.random() - 0.5) * 20,
+                text: emojis[Math.floor(Math.random() * emojis.length)],
+                size: Math.random() * 20 + 20,
+                life: 100,
+                gravity: 0.5
+            });
+        }
+
+        function update() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            let active = false;
+            for(let i=0; i<particles.length; i++) {
+                let p = particles[i];
+                if(p.life > 0) {
+                    active = true;
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.vy += p.gravity;
+                    p.life--;
+                    
+                    ctx.font = `${p.size}px Arial`;
+                    ctx.fillText(p.text, p.x, p.y);
+                }
+            }
+            if(active) requestAnimationFrame(update);
+        }
+        update();
+    }
+
+    console.log("%c SYSTEM OVERRIDE: She's definitely the one.", "color: #ff0055; font-size: 16px; font-weight: bold;");
+    
+    // Enter key
+    nameInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') attemptLogin();
+    });
+
+</script>
+</body>
+</html>
