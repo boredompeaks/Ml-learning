@@ -14,8 +14,8 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 // ─────────────────────────────────────────────────────────────
 export const CONFIG = Object.freeze({
   // ── Supabase credentials (replace before deploy) ──
-  SUPABASE_URL: 'YOUR_SUPABASE_URL_HERE',
-  SUPABASE_ANON_KEY: 'YOUR_SUPABASE_ANON_KEY_HERE',
+  SUPABASE_URL: 'https://jotezuumxzizgejfthcc.supabase.co',
+  SUPABASE_ANON_KEY: 'sb_publishable_DUpzh7Nls9meEhwAvo56TA_mHLHefzU',
 
   // ── Cryptography ──
   PBKDF2_ITERATIONS: 100_000,
