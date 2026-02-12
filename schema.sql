@@ -138,32 +138,9 @@ comment on table public.conversations is 'Chat conversations — salt used for P
 
 alter table public.conversations enable row level security;
 
--- Users can only see/update conversations they participate in
-create policy "conversations_select_participant"
-  on public.conversations for select
-  using (
-    exists (
-      select 1 from public.conversation_participants cp
-      where cp.conversation_id = id
-        and cp.user_id = auth.uid()
-    )
-  );
-
-create policy "conversations_update_participant"
-  on public.conversations for update
-  using (
-    exists (
-      select 1 from public.conversation_participants cp
-      where cp.conversation_id = id
-        and cp.user_id = auth.uid()
-    )
-  );
-
--- Insert allowed by service-role functions (get_or_create_conversation)
--- Direct insert not exposed to clients
-create policy "conversations_insert_authenticated"
-  on public.conversations for insert
-  with check (auth.role() = 'authenticated');
+-- NOTE: Policies for conversations are created AFTER the
+-- is_user_in_conversation() function is defined (below)
+-- to avoid infinite RLS recursion.
 
 
 -- ═══════════════════════════════════════════════════════════════
@@ -183,16 +160,9 @@ comment on table public.conversation_participants is 'Links users to conversatio
 
 alter table public.conversation_participants enable row level security;
 
--- Users can see participants of conversations they belong to
-create policy "cp_select_participant"
-  on public.conversation_participants for select
-  using (
-    exists (
-      select 1 from public.conversation_participants cp2
-      where cp2.conversation_id = conversation_id
-        and cp2.user_id = auth.uid()
-    )
-  );
+-- NOTE: cp_select_participant policy is created AFTER the
+-- is_user_in_conversation() function is defined (below)
+-- to avoid infinite RLS recursion.
 
 -- Users can be added to conversations (by the RPC function)
 create policy "cp_insert_authenticated"
@@ -234,41 +204,9 @@ comment on table public.messages is 'End-to-end encrypted messages — server st
 
 alter table public.messages enable row level security;
 
--- Users can read messages in conversations they participate in
-create policy "messages_select_participant"
-  on public.messages for select
-  using (
-    exists (
-      select 1 from public.conversation_participants cp
-      where cp.conversation_id = conversation_id
-        and cp.user_id = auth.uid()
-    )
-  );
-
--- Users can send messages to conversations they participate in
-create policy "messages_insert_participant"
-  on public.messages for insert
-  with check (
-    sender_id = auth.uid()
-    and exists (
-      select 1 from public.conversation_participants cp
-      where cp.conversation_id = conversation_id
-        and cp.user_id = auth.uid()
-    )
-  );
-
--- Users can update their own messages (status, delete for everyone)
--- Also allow RPC functions to update status (mark as read)
-create policy "messages_update_own_or_status"
-  on public.messages for update
-  using (
-    sender_id = auth.uid()
-    or exists (
-      select 1 from public.conversation_participants cp
-      where cp.conversation_id = conversation_id
-        and cp.user_id = auth.uid()
-    )
-  );
+-- NOTE: Message policies are created AFTER the
+-- is_user_in_conversation() function is defined (below)
+-- to avoid infinite RLS recursion.
 
 
 -- ═══════════════════════════════════════════════════════════════
@@ -438,6 +376,82 @@ create trigger trg_messages_updated
 create trigger trg_user_status_updated
   before update on public.user_status
   for each row execute function public.update_modified_column();
+
+
+-- ═══════════════════════════════════════════════════════════════
+--  FUNCTION: is_user_in_conversation()
+--  SECURITY DEFINER helper to avoid infinite RLS recursion.
+--  Called from RLS policies on conversations, participants, messages.
+-- ═══════════════════════════════════════════════════════════════
+create or replace function public.is_user_in_conversation(
+  p_conversation_id uuid,
+  p_user_id uuid
+)
+returns boolean
+language sql
+security definer
+stable
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from public.conversation_participants
+    where conversation_id = p_conversation_id
+      and user_id = p_user_id
+  );
+$$;
+
+
+-- ── Deferred RLS policies (use is_user_in_conversation to avoid recursion) ──
+
+-- conversation_participants: SELECT
+create policy "cp_select_participant"
+  on public.conversation_participants for select
+  using (
+    public.is_user_in_conversation(conversation_id, auth.uid())
+  );
+
+-- conversations: SELECT
+create policy "conversations_select_participant"
+  on public.conversations for select
+  using (
+    public.is_user_in_conversation(id, auth.uid())
+  );
+
+-- conversations: UPDATE
+create policy "conversations_update_participant"
+  on public.conversations for update
+  using (
+    public.is_user_in_conversation(id, auth.uid())
+  );
+
+-- conversations: INSERT (by authenticated users via RPC)
+create policy "conversations_insert_authenticated"
+  on public.conversations for insert
+  with check (auth.role() = 'authenticated');
+
+-- messages: SELECT
+create policy "messages_select_participant"
+  on public.messages for select
+  using (
+    public.is_user_in_conversation(conversation_id, auth.uid())
+  );
+
+-- messages: INSERT
+create policy "messages_insert_participant"
+  on public.messages for insert
+  with check (
+    sender_id = auth.uid()
+    and public.is_user_in_conversation(conversation_id, auth.uid())
+  );
+
+-- messages: UPDATE
+create policy "messages_update_own_or_status"
+  on public.messages for update
+  using (
+    sender_id = auth.uid()
+    or public.is_user_in_conversation(conversation_id, auth.uid())
+  );
 
 
 -- ═══════════════════════════════════════════════════════════════

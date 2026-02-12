@@ -939,7 +939,10 @@ class _SupabaseService {
   async setUserStatus(userId, status) {
     const { error } = await this.client
       .from('user_status')
-      .upsert({ user_id: userId, status, last_seen: new Date().toISOString() });
+      .upsert(
+        { user_id: userId, status, last_seen: new Date().toISOString() },
+        { onConflict: 'user_id' }
+      );
     if (error) throw error;
   }
 
